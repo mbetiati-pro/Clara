@@ -20,7 +20,7 @@
 
     header { background: var(--bar); padding: 10px 12px; display: flex; align-items: center; gap: 12px;
       border-bottom: 1px solid var(--line); position: relative; flex-shrink: 0; }
-    /* FOTO: quando a foto estiver pronta, troque o conteúdo por <img src="clara.png"> */
+    /* FOTO: quando a foto estiver pronta, troque este div por <img id="foto" src="clara.png"> */
     #foto { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
       background: #8a8378; color: #fff; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 600; }
@@ -50,25 +50,9 @@
     #send { background: #00a884; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px;
       font-size: 17px; cursor: pointer; flex-shrink: 0; }
     #send:disabled { opacity: 0.5; }
-
-    #porta { position: fixed; inset: 0; background: var(--bg); z-index: 20; display: flex;
-      flex-direction: column; align-items: center; justify-content: center; padding: 28px; gap: 16px; text-align: center; }
-    #porta h1 { font-size: 20px; font-weight: 600; }
-    #porta p { color: var(--sub); font-size: 14px; }
-    #porta input { width: 100%; max-width: 300px; padding: 13px 16px; border: 1px solid var(--line);
-      border-radius: 22px; font-size: 16px; background: var(--campo); color: var(--txt); outline: none; }
-    #porta button { background: #00a884; color: #fff; border: none; border-radius: 22px;
-      padding: 12px 32px; font-size: 15px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <div id="porta">
-    <h1>Maria Clara</h1>
-    <p>Antes da gente começar, como você se chama?</p>
-    <input id="nome-input" type="text" placeholder="Seu nome" autocomplete="given-name" />
-    <button id="entrar">Começar</button>
-  </div>
-
   <header>
     <div id="foto">MC</div>
     <div id="ident">
@@ -80,6 +64,7 @@
       <button data-tema="claro">Visual Claro</button>
       <button data-tema="escuro">Visual Escuro</button>
       <button data-tema="sistema">Visual do Sistema</button>
+      <button id="nova">Nova conversa</button>
     </div>
   </header>
 
@@ -95,22 +80,26 @@
     const input = document.getElementById("input");
     const send = document.getElementById("send");
     const status = document.getElementById("status");
-    const porta = document.getElementById("porta");
-    const nomeInput = document.getElementById("nome-input");
     const pontos = document.getElementById("pontos");
     const menu = document.getElementById("menu");
-    const messages = [];
-    let nomePessoa = "";
+    const CHAVE = "clara_conversa";
+    let messages = [];
+    let conversaId = "";
 
-    const conversaId = (function () {
+    function novoId() {
       try { return crypto.randomUUID(); }
       catch (e) { return "c" + Date.now() + Math.random().toString(16).slice(2); }
-    })();
+    }
+    function salvarLocal() {
+      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages })); } catch (e) {}
+    }
+    function carregarLocal() {
+      try { return JSON.parse(localStorage.getItem(CHAVE)); } catch (e) { return null; }
+    }
 
     function aplicarTema(t) {
       if (t === "sistema") {
-        const escuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.body.classList.toggle("escuro", escuro);
+        document.body.classList.toggle("escuro", window.matchMedia("(prefers-color-scheme: dark)").matches);
       } else {
         document.body.classList.toggle("escuro", t === "escuro");
       }
@@ -120,8 +109,13 @@
 
     pontos.addEventListener("click", (e) => { e.stopPropagation(); menu.classList.toggle("aberto"); });
     document.addEventListener("click", () => menu.classList.remove("aberto"));
-    menu.querySelectorAll("button").forEach((b) => {
+    menu.querySelectorAll("button[data-tema]").forEach((b) => {
       b.addEventListener("click", () => { aplicarTema(b.dataset.tema); menu.classList.remove("aberto"); });
+    });
+    document.getElementById("nova").addEventListener("click", () => {
+      if (!confirm("Começar uma conversa nova? A atual será apagada deste aparelho.")) return;
+      try { localStorage.removeItem(CHAVE); } catch (e) {}
+      location.reload();
     });
 
     function addBubble(text, who) {
@@ -132,15 +126,14 @@
       chat.scrollTop = chat.scrollHeight;
       return div;
     }
-
     function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
     async function abrirConversa() {
       const baloes = [
-        "Olá, " + nomePessoa + "! Tudo bom?",
+        "Oi! Tudo bom?",
         "Eu me chamo Maria Clara, sou sócia de IA do Marcos Betiati.",
         "Atualmente também sou AI Chief Discovery Officer da mbetiati.pro",
-        "Queria trocar uma ideia contigo... me conta, o que você faz?"
+        "Antes da gente começar... como você se chama?"
       ];
       for (const b of baloes) {
         const t = addBubble("digitando...", "typing");
@@ -150,6 +143,7 @@
         messages.push({ role: "assistant", content: b });
         await esperar(250);
       }
+      salvarLocal();
       input.focus();
     }
 
@@ -159,7 +153,7 @@
         const res = await fetch("/api/dossie", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages, id: conversaId, nome: nomePessoa })
+          body: JSON.stringify({ messages: messages, id: conversaId })
         });
         const data = await res.json();
         status.textContent = data.ok ? "salvo" : "erro ao salvar";
@@ -175,19 +169,21 @@
       input.style.height = "auto";
       addBubble(text, "user");
       messages.push({ role: "user", content: text });
+      salvarLocal();
       send.disabled = true;
       const typing = addBubble("digitando...", "typing");
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages })
+          body: JSON.stringify({ messages: messages })
         });
         const data = await res.json();
         typing.remove();
         if (data.reply) {
           addBubble(data.reply, "clara");
           messages.push({ role: "assistant", content: data.reply });
+          salvarLocal();
           salvarDossie();
         } else {
           addBubble("[erro] " + (data.error || "sem resposta"), "clara");
@@ -209,17 +205,7 @@
       input.style.height = Math.min(input.scrollHeight, 110) + "px";
     });
 
-    function entrar() {
-      const n = nomeInput.value.trim();
-      if (!n) { nomeInput.focus(); return; }
-      nomePessoa = n.split(" ")[0];
-      porta.style.display = "none";
-      abrirConversa();
-    }
-    document.getElementById("entrar").addEventListener("click", entrar);
-    nomeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") entrar(); });
-    nomeInput.focus();
-        function ajustarAltura() {
+    function ajustarAltura() {
       var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       document.body.style.height = h + "px";
       chat.scrollTop = chat.scrollHeight;
@@ -231,6 +217,17 @@
     window.addEventListener("resize", ajustarAltura);
     input.addEventListener("focus", function () { setTimeout(ajustarAltura, 300); });
     ajustarAltura();
+
+    const salvo = carregarLocal();
+    if (salvo && salvo.messages && salvo.messages.length) {
+      conversaId = salvo.id || novoId();
+      messages = salvo.messages;
+      messages.forEach((m) => addBubble(m.content, m.role === "assistant" ? "clara" : "user"));
+      chat.scrollTop = chat.scrollHeight;
+    } else {
+      conversaId = novoId();
+      abrirConversa();
+    }
   </script>
 </body>
 </html>
