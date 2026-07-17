@@ -14,6 +14,7 @@
       --bolha-clara: #202c33; --bolha-user: #005c4b; --campo: #2a3942; --menu: #233138;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { overflow: hidden; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg); color: var(--txt); height: 100dvh; display: flex; flex-direction: column; }
 
@@ -218,6 +219,18 @@
     document.getElementById("entrar").addEventListener("click", entrar);
     nomeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") entrar(); });
     nomeInput.focus();
+        function ajustarAltura() {
+      var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.body.style.height = h + "px";
+      chat.scrollTop = chat.scrollHeight;
+    }
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", ajustarAltura);
+      window.visualViewport.addEventListener("scroll", ajustarAltura);
+    }
+    window.addEventListener("resize", ajustarAltura);
+    input.addEventListener("focus", function () { setTimeout(ajustarAltura, 300); });
+    ajustarAltura();
   </script>
 </body>
 </html>
