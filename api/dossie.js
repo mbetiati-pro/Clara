@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (!sheetsUrl) return res.status(500).json({ error: "SHEETS_URL não configurada." });
 
   try {
-    const { messages, id, nome } = req.body || {};
+    const { messages, id } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Sem conversa para resumir." });
     }
@@ -22,15 +22,16 @@ export default async function handler(req, res) {
     }).join("\n\n");
 
     const instrucaoDossie =
-      "Você recebe a transcrição de uma conversa entre a Clara (IA) e um dono de negócio. " +
+      "Você recebe a transcrição de uma conversa entre a Maria Clara (IA) e um dono de negócio. " +
       "A conversa pode estar incompleta (em andamento) - tudo bem, resuma o que houver até aqui. " +
       "Produza um dossiê curto e objetivo PARA O MARCOS usar antes da reunião. " +
       "Responda SOMENTE com um JSON válido, sem texto antes ou depois, com exatamente estas chaves: " +
+      "nome (o primeiro nome da pessoa, só o nome, nada mais), " +
       "negocio (o que o negócio faz, em uma frase), " +
       "dor (a dor principal, de preferência com as PALAVRAS da própria pessoa entre aspas), " +
-      "qualificacao (leitura de orçamento, poder de decisão e prontidão, em uma ou duas frases), " +
-      "ofertou (responda só 'sim' ou 'não': a Clara chegou a oferecer o Plano de R$ 3.907?), " +
-      "leitura (a leitura estratégica: por onde o Marcos deve puxar na reunião, o gancho mais forte). " +
+      "qualificacao (leitura de faturamento/receita, poder de decisão, se tem processo desenhado e prontidão), " +
+      "ofertou (responda só 'sim' ou 'não': a Maria Clara chegou a oferecer o Plano de R$ 3.907?), " +
+      "leitura (a leitura estratégica: por onde o Marcos deve puxar, o gancho mais forte). " +
       "Se algum campo ainda não tiver informação, escreva 'não informado'.";
 
     const model = "gemini-2.5-flash";
@@ -58,12 +59,12 @@ export default async function handler(req, res) {
     try {
       dossie = JSON.parse(texto);
     } catch (e) {
-      dossie = { negocio: "", dor: "", qualificacao: "", ofertou: "", leitura: "Não estruturou. Bruto: " + texto };
+      dossie = { nome: "", negocio: "", dor: "", qualificacao: "", ofertou: "", leitura: "Não estruturou. Bruto: " + texto };
     }
 
     const linha = {
       id: id || "",
-      nome: nome || "",
+      nome: dossie.nome || "",
       negocio: dossie.negocio || "",
       dor: dossie.dor || "",
       qualificacao: dossie.qualificacao || "",
@@ -91,7 +92,4 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ ok: true });
-  } catch (err) {
-    return res.status(500).json({ error: "Falha: " + String(err) });
   }
-}
