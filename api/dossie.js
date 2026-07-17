@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (!sheetsUrl) return res.status(500).json({ error: "SHEETS_URL não configurada." });
 
   try {
-    const { messages, id } = req.body || {};
+    const { messages, id, nome } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Sem conversa para resumir." });
     }
@@ -63,6 +63,7 @@ export default async function handler(req, res) {
 
     const linha = {
       id: id || "",
+      nome: nome || "",
       negocio: dossie.negocio || "",
       dor: dossie.dor || "",
       qualificacao: dossie.qualificacao || "",
