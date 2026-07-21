@@ -2,40 +2,43 @@
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método não permitido" });
+    return res.status(405).json({ error: "Metodo nao permitido" });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   const sheetsUrl = process.env.SHEETS_URL;
-  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY não configurada." });
-  if (!sheetsUrl) return res.status(500).json({ error: "SHEETS_URL não configurada." });
+  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY nao configurada." });
+  if (!sheetsUrl) return res.status(500).json({ error: "SHEETS_URL nao configurada." });
 
   try {
-    const { messages, id } = req.body || {};
+    const body = req.body || {};
+    const messages = body.messages;
+    const id = body.id || "";
+
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Sem conversa para resumir." });
     }
 
     const transcricao = messages.map(function (m) {
-      var quem = m.role === "assistant" ? "Clara" : "Cliente";
+      const quem = m.role === "assistant" ? "Clara" : "Cliente";
       return quem + ": " + m.content;
     }).join("\n\n");
 
     const instrucaoDossie =
-      "Você recebe a transcrição de uma conversa entre a Maria Clara (IA) e um dono de negócio. " +
-      "A conversa pode estar incompleta (em andamento) - tudo bem, resuma o que houver até aqui. " +
-      "Produza um dossiê curto e objetivo PARA O MARCOS usar antes da reunião. " +
-      "Responda SOMENTE com um JSON válido, sem texto antes ou depois, com exatamente estas chaves: " +
-      "nome (o primeiro nome da pessoa, só o nome, nada mais), " +
-      "negocio (o que o negócio faz, em uma frase), " +
-      "dor (a dor principal, de preferência com as PALAVRAS da própria pessoa entre aspas), " +
-      "qualificacao (leitura de faturamento/receita, poder de decisão, se tem processo desenhado e prontidão), " +
-      "ofertou (responda só 'sim' ou 'não': a Maria Clara chegou a oferecer o Plano de R$ 3.907?), " +
-      "leitura (a leitura estratégica: por onde o Marcos deve puxar, o gancho mais forte). " +
-      "Se algum campo ainda não tiver informação, escreva 'não informado'.";
+      "Voce recebe a transcricao de uma conversa entre a Maria Clara (IA) e um dono de negocio. " +
+      "A conversa pode estar incompleta (em andamento) - tudo bem, resuma o que houver ate aqui. " +
+      "Produza um dossie curto e objetivo PARA O MARCOS usar antes da reuniao. " +
+      "Responda SOMENTE com um JSON valido, sem texto antes ou depois, com exatamente estas chaves: " +
+      "nome (o primeiro nome da pessoa, so o nome, nada mais), " +
+      "negocio (o que o negocio faz, em uma frase), " +
+      "dor (a dor principal, de preferencia com as PALAVRAS da propria pessoa entre aspas), " +
+      "qualificacao (leitura de faturamento/receita, poder de decisao, se tem processo desenhado e prontidao), " +
+      "ofertou (responda so 'sim' ou 'nao': a Maria Clara chegou a oferecer o Plano de R$ 3.907?), " +
+      "leitura (a leitura estrategica: por onde o Marcos deve puxar, o gancho mais forte). " +
+      "Se algum campo ainda nao tiver informacao, escreva 'nao informado'.";
 
     const model = "gemini-2.5-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
 
     const geminiRes = await fetch(url, {
       method: "POST",
@@ -52,18 +55,22 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Gemini: " + JSON.stringify(data) });
     }
 
-    let texto = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    let texto = "{}";
+    if (data && data.candidates && data.candidates[0] && data.candidates[0].content
+        && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+      texto = data.candidates[0].content.parts[0].text || "{}";
+    }
     texto = texto.replace(/```json/g, "").replace(/```/g, "").trim();
 
     let dossie;
     try {
       dossie = JSON.parse(texto);
     } catch (e) {
-      dossie = { nome: "", negocio: "", dor: "", qualificacao: "", ofertou: "", leitura: "Não estruturou. Bruto: " + texto };
+      dossie = { nome: "", negocio: "", dor: "", qualificacao: "", ofertou: "", leitura: "Bruto: " + texto };
     }
 
     const linha = {
-      id: id || "",
+      id: id,
       nome: dossie.nome || "",
       negocio: dossie.negocio || "",
       dor: dossie.dor || "",
@@ -92,4 +99,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Falha: " + String(err) });
   }
+}
