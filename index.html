@@ -37,7 +37,17 @@
       white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
     .clara { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px; }
     .user { align-self: flex-end; background: var(--bolha-user); border-top-right-radius: 2px; }
-    .typing { align-self: flex-start; color: var(--sub); font-style: italic; font-size: 13px; padding: 4px 11px; }
+    #cargo.digitando { color: #00a884; }
+    .typing { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px;
+      padding: 11px 14px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); display: inline-flex; gap: 4px; align-items: center; }
+    .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--sub);
+      display: inline-block; animation: digita 1.2s infinite ease-in-out; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes digita {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
     #status { display: none; }
     footer { padding: 8px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
     #input { flex: 1; padding: 11px 14px; border: none; border-radius: 22px; font-size: 15px;
@@ -76,6 +86,8 @@
     var status = document.getElementById("status");
     var pontos = document.getElementById("pontos");
     var menu = document.getElementById("menu");
+    var cargo = document.getElementById("cargo");
+    var CARGO_ORIGINAL = cargo.textContent;
     var CHAVE = "clara_conversa";
     var messages = [];
     var conversaId = "";
@@ -130,6 +142,36 @@
     }
     function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+    // Tempo de "digitando" proporcional ao tamanho da mensagem.
+    // Humano real digita ~250 ms/letra; aqui uso 35 ms/letra pra simular sem travar a tela.
+    function tempoDigitando(texto) {
+      var BASE = 500;      // batida inicial (ela viu e comecou a digitar)
+      var POR_LETRA = 35;  // ms por caractere
+      var MIN = 700;
+      var MAX = 2200;
+      var t = BASE + String(texto).length * POR_LETRA;
+      return Math.max(MIN, Math.min(MAX, t));
+    }
+
+    function criarBolhaDigitando() {
+      var div = document.createElement("div");
+      div.className = "msg typing";
+      div.innerHTML = "<span></span><span></span><span></span>";
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+    function mostrarDigitando() {
+      cargo.textContent = "digitando...";
+      cargo.classList.add("digitando");
+      return criarBolhaDigitando();
+    }
+    function esconderDigitando(bolha) {
+      if (bolha) bolha.remove();
+      cargo.textContent = CARGO_ORIGINAL;
+      cargo.classList.remove("digitando");
+    }
+
     async function abrirConversa() {
       var baloes = [
         "Ola! Tudo bom?",
@@ -138,12 +180,12 @@
         "Antes da gente comecar... como voce se chama?"
       ];
       for (var i = 0; i < baloes.length; i++) {
-        var t = addBubble("digitando...", "typing");
-        await esperar(700);
-        t.remove();
+        var t = mostrarDigitando();
+        await esperar(tempoDigitando(baloes[i]));
+        esconderDigitando(t);
         addBubble(baloes[i], "clara");
         messages.push({ role: "assistant", content: baloes[i] });
-        await esperar(250);
+        await esperar(320);
       }
       salvarLocal();
       input.focus();
@@ -173,7 +215,8 @@
       messages.push({ role: "user", content: text });
       salvarLocal();
       send.disabled = true;
-      var typing = addBubble("digitando...", "typing");
+      var inicio = Date.now();
+      var typing = mostrarDigitando();
       try {
         var res = await fetch("/api/chat", {
           method: "POST",
@@ -181,17 +224,22 @@
           body: JSON.stringify({ messages: messages })
         });
         var data = await res.json();
-        typing.remove();
         if (data.reply) {
+          // cadencia minima proporcional ao tamanho; se a API ja demorou mais, revela na hora
+          var alvo = tempoDigitando(data.reply);
+          var jaEsperou = Date.now() - inicio;
+          if (jaEsperou < alvo) await esperar(alvo - jaEsperou);
+          esconderDigitando(typing);
           addBubble(data.reply, "clara");
           messages.push({ role: "assistant", content: data.reply });
           salvarLocal();
           salvarDossie();
         } else {
+          esconderDigitando(typing);
           addBubble("[erro] " + (data.error || "sem resposta"), "clara");
         }
       } catch (err) {
-        typing.remove();
+        esconderDigitando(typing);
         addBubble("[erro de conexao] " + err, "clara");
       }
       send.disabled = false;
