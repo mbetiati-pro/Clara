@@ -17,10 +17,8 @@
     html, body { overflow: hidden; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg); color: var(--txt); height: 100dvh; display: flex; flex-direction: column; }
-
     header { background: var(--bar); padding: 10px 12px; display: flex; align-items: center; gap: 12px;
       border-bottom: 1px solid var(--line); position: relative; flex-shrink: 0; }
-    /* FOTO: quando a foto estiver pronta, troque este div por <img id="foto" src="clara.png"> */
     #foto { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
       background: #8a8378; color: #fff; display: flex; align-items: center; justify-content: center;
       font-size: 14px; font-weight: 600; }
@@ -34,7 +32,6 @@
     #menu button { display: block; width: 100%; text-align: left; background: none; border: none;
       color: var(--txt); padding: 12px 20px; font-size: 14px; cursor: pointer; white-space: nowrap; }
     #menu button:hover { background: var(--line); }
-
     #chat { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; }
     .msg { max-width: 78%; padding: 7px 11px; border-radius: 8px; line-height: 1.45; font-size: 15px;
       white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
@@ -42,7 +39,6 @@
     .user { align-self: flex-end; background: var(--bolha-user); border-top-right-radius: 2px; }
     .typing { align-self: flex-start; color: var(--sub); font-style: italic; font-size: 13px; padding: 4px 11px; }
     #status { display: none; }
-
     footer { padding: 8px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
     #input { flex: 1; padding: 11px 14px; border: none; border-radius: 22px; font-size: 15px;
       background: var(--campo); color: var(--txt); outline: none; resize: none; max-height: 110px;
@@ -67,24 +63,22 @@
       <button id="nova">Nova conversa</button>
     </div>
   </header>
-
   <div id="chat"></div>
   <div id="status"></div>
   <footer>
     <textarea id="input" rows="1" placeholder="Mensagem"></textarea>
     <button id="send">&#10148;</button>
   </footer>
-
   <script>
-    const chat = document.getElementById("chat");
-    const input = document.getElementById("input");
-    const send = document.getElementById("send");
-    const status = document.getElementById("status");
-    const pontos = document.getElementById("pontos");
-    const menu = document.getElementById("menu");
-    const CHAVE = "clara_conversa";
-    let messages = [];
-    let conversaId = "";
+    var chat = document.getElementById("chat");
+    var input = document.getElementById("input");
+    var send = document.getElementById("send");
+    var status = document.getElementById("status");
+    var pontos = document.getElementById("pontos");
+    var menu = document.getElementById("menu");
+    var CHAVE = "clara_conversa";
+    var messages = [];
+    var conversaId = "";
 
     function novoId() {
       try { return crypto.randomUUID(); }
@@ -96,7 +90,6 @@
     function carregarLocal() {
       try { return JSON.parse(localStorage.getItem(CHAVE)); } catch (e) { return null; }
     }
-
     function aplicarTema(t) {
       if (t === "sistema") {
         document.body.classList.toggle("escuro", window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -107,23 +100,26 @@
     }
     aplicarTema(localStorage.getItem("tema") || "sistema");
 
-    pontos.addEventListener("click", (e) => { e.stopPropagation(); menu.classList.toggle("aberto"); });
-    document.addEventListener("click", () => menu.classList.remove("aberto"));
-    menu.querySelectorAll("button[data-tema]").forEach((b) => {
-      b.addEventListener("click", () => { aplicarTema(b.dataset.tema); menu.classList.remove("aberto"); });
-    });
-    document.getElementById("nova").addEventListener("click", () => {
-      if (!confirm("Começar uma conversa nova? A atual será apagada deste aparelho.")) return;
+    pontos.addEventListener("click", function (e) { e.stopPropagation(); menu.classList.toggle("aberto"); });
+    document.addEventListener("click", function () { menu.classList.remove("aberto"); });
+    var temaBtns = menu.querySelectorAll("button[data-tema]");
+    for (var i = 0; i < temaBtns.length; i++) {
+      (function (b) {
+        b.addEventListener("click", function () { aplicarTema(b.dataset.tema); menu.classList.remove("aberto"); });
+      })(temaBtns[i]);
+    }
+    document.getElementById("nova").addEventListener("click", function () {
+      if (!confirm("Comecar uma conversa nova? A atual sera apagada deste aparelho.")) return;
       try { localStorage.removeItem(CHAVE); } catch (e) {}
       location.reload();
     });
 
     function addBubble(text, who) {
-      const partes = String(text).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
-      const blocos = partes.length ? partes : [String(text)];
-      let ultimo = null;
+      var partes = String(text).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+      var blocos = partes.length ? partes : [String(text)];
+      var ultimo = null;
       blocos.forEach(function (parte) {
-        const div = document.createElement("div");
+        var div = document.createElement("div");
         div.className = "msg " + who;
         div.textContent = parte;
         chat.appendChild(div);
@@ -132,21 +128,21 @@
       chat.scrollTop = chat.scrollHeight;
       return ultimo;
     }
-    function esperar(ms) { return new Promise((r) => setTimeout(r, ms)); }
+    function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
     async function abrirConversa() {
-      const baloes = [
-        "Olá! Tudo bom?,
-        "Eu me chamo Maria Clara, sou sócia de IA do Marcos Betiati.",
-        "Atualmente também sou AI Chief Discovery Officer da mbetiati.pro",
-        "Antes da gente começar... como você se chama?"
+      var baloes = [
+        "Ola! Tudo bom?",
+        "Eu me chamo Maria Clara, sou socia de IA do Marcos Betiati.",
+        "Atualmente tambem sou AI Chief Discovery Officer da mbetiati.pro",
+        "Antes da gente comecar... como voce se chama?"
       ];
-      for (const b of baloes) {
-        const t = addBubble("digitando...", "typing");
+      for (var i = 0; i < baloes.length; i++) {
+        var t = addBubble("digitando...", "typing");
         await esperar(700);
         t.remove();
-        addBubble(b, "clara");
-        messages.push({ role: "assistant", content: b });
+        addBubble(baloes[i], "clara");
+        messages.push({ role: "assistant", content: baloes[i] });
         await esperar(250);
       }
       salvarLocal();
@@ -156,12 +152,12 @@
     async function salvarDossie() {
       if (messages.length < 6) return;
       try {
-        const res = await fetch("/api/dossie", {
+        var res = await fetch("/api/dossie", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: messages, id: conversaId })
         });
-        const data = await res.json();
+        var data = await res.json();
         status.textContent = data.ok ? "salvo" : "erro ao salvar";
       } catch (err) {
         status.textContent = "erro ao salvar";
@@ -169,7 +165,7 @@
     }
 
     async function sendMessage() {
-      const text = input.value.trim();
+      var text = input.value.trim();
       if (!text) return;
       input.value = "";
       input.style.height = "auto";
@@ -177,14 +173,14 @@
       messages.push({ role: "user", content: text });
       salvarLocal();
       send.disabled = true;
-      const typing = addBubble("digitando...", "typing");
+      var typing = addBubble("digitando...", "typing");
       try {
-        const res = await fetch("/api/chat", {
+        var res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: messages })
         });
-        const data = await res.json();
+        var data = await res.json();
         typing.remove();
         if (data.reply) {
           addBubble(data.reply, "clara");
@@ -196,17 +192,17 @@
         }
       } catch (err) {
         typing.remove();
-        addBubble("[erro de conexão] " + err, "clara");
+        addBubble("[erro de conexao] " + err, "clara");
       }
       send.disabled = false;
       input.focus();
     }
 
     send.addEventListener("click", sendMessage);
-    input.addEventListener("keydown", (e) => {
+    input.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
-    input.addEventListener("input", () => {
+    input.addEventListener("input", function () {
       input.style.height = "auto";
       input.style.height = Math.min(input.scrollHeight, 110) + "px";
     });
@@ -224,11 +220,13 @@
     input.addEventListener("focus", function () { setTimeout(ajustarAltura, 300); });
     ajustarAltura();
 
-    const salvo = carregarLocal();
+    var salvo = carregarLocal();
     if (salvo && salvo.messages && salvo.messages.length) {
       conversaId = salvo.id || novoId();
       messages = salvo.messages;
-      messages.forEach((m) => addBubble(m.content, m.role === "assistant" ? "clara" : "user"));
+      for (var j = 0; j < messages.length; j++) {
+        addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user");
+      }
       chat.scrollTop = chat.scrollHeight;
     } else {
       conversaId = novoId();
