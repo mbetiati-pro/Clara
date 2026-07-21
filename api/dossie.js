@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       "leitura (a leitura estrategica: por onde o Marcos deve puxar, o gancho mais forte). " +
       "Se algum campo ainda nao tiver informacao, escreva 'nao informado'.";
 
-    const model = "gemini-2.5-flash-lite";
+    const model = "gemini-3-flash";
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
 
     const geminiRes = await fetch(url, {
