@@ -125,7 +125,7 @@ Se a pessoa não tem negócio, não tem dor real, ou só quer bater papo, não f
       parts: [{ text: m.content }]
     }));
 
-    const model = "gemini-2.5-flash-lite";
+    const model = "gemini-3-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const geminiRes = await fetch(url, {
