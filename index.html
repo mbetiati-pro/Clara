@@ -352,8 +352,33 @@
       focarSePuder();
     }
 
+    // ---- dossie: cadencia enxuta ----
+    // Antes: rodava a cada resposta da Clara (cerca de 30 chamadas por conversa).
+    // Agora: quando a conversa fica parada, quando a pessoa sai da aba,
+    // e na hora em que a Clara manda o link de pagamento.
+    var TEMPO_OCIOSO_DOSSIE = 90000; // 90 segundos sem atividade
+    var timerDossie = null;
+    var dossieEnviando = false;
+    var dossieUltimoTamanho = 0;
+
+    function agendarDossie() {
+      if (timerDossie) clearTimeout(timerDossie);
+      timerDossie = setTimeout(function () {
+        timerDossie = null;
+        salvarDossie();
+      }, TEMPO_OCIOSO_DOSSIE);
+    }
+
+    function precisaSalvarDossie() {
+      if (messages.length < 6) return false;
+      if (messages.length === dossieUltimoTamanho) return false;
+      return true;
+    }
+
     async function salvarDossie() {
-      if (messages.length < 6) return;
+      if (!precisaSalvarDossie() || dossieEnviando) return;
+      dossieEnviando = true;
+      var tamanhoNoEnvio = messages.length;
       try {
         var res = await fetch("/api/dossie", {
           method: "POST",
@@ -361,15 +386,33 @@
           body: JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado })
         });
         var data = await res.json();
+        if (data && data.ok) { dossieUltimoTamanho = tamanhoNoEnvio; }
         if (data && data.briefingEnviado) {
           briefingEnviado = true;
           salvarLocal();
         }
-        status.textContent = data.ok ? "salvo" : "erro ao salvar";
+        status.textContent = (data && data.ok) ? "salvo" : "erro ao salvar";
       } catch (err) {
         status.textContent = "erro ao salvar";
       }
+      dossieEnviando = false;
     }
+
+    // Ao fechar ou minimizar a aba: manda de uma vez so, sem esperar resposta.
+    function salvarDossieAoSair() {
+      if (!precisaSalvarDossie()) return;
+      try {
+        var corpo = JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado });
+        var pacote = new Blob([corpo], { type: "application/json" });
+        if (navigator.sendBeacon && navigator.sendBeacon("/api/dossie", pacote)) {
+          dossieUltimoTamanho = messages.length;
+        }
+      } catch (e) {}
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") salvarDossieAoSair();
+    });
+    window.addEventListener("pagehide", salvarDossieAoSair);
 
     // Espera a pessoa terminar de mandar as bolhas antes de responder.
     // Se ela manda uma correcao logo em seguida, a Clara le tudo junto.
@@ -388,6 +431,7 @@
       messages.push({ role: "user", content: text, t: agora });
       salvarLocal();
       agendarResposta();
+      agendarDossie();
     }
 
     function agendarResposta() {
@@ -405,6 +449,7 @@
       send.disabled = true;
       var inicio = Date.now();
       var typing = mostrarDigitando();
+      var houveFalha = false;
       try {
         var res = await fetch("/api/chat", {
           method: "POST",
@@ -430,20 +475,34 @@
           }
           messages.push({ role: "assistant", content: data.reply });
           salvarLocal();
-          salvarDossie();
+          // Fechou: link de pagamento na tela. Grava e dispara o briefing na hora.
+          if (String(data.reply).indexOf("asaas.com/c/") !== -1) {
+            salvarDossie();
+          } else {
+            agendarDossie();
+          }
+        } else if (data.aviso) {
+          // Recado da propria Clara quando a API nao respondeu.
+          // NAO entra no historico: e transitorio, nao faz parte da conversa.
+          houveFalha = true;
+          esconderDigitando(typing);
+          addBubble(data.aviso, "clara");
         } else {
+          houveFalha = true;
           esconderDigitando(typing);
           addBubble("[erro] " + (data.error || "sem resposta"), "clara");
         }
       } catch (err) {
+        houveFalha = true;
         esconderDigitando(typing);
         addBubble("[erro de conexao] " + err, "clara");
       }
       respondendo = false;
       send.disabled = false;
       focarSePuder();
-      // se a pessoa mandou mais bolhas enquanto eu respondia, responde de novo
-      if (messages.length && messages[messages.length - 1].role === "user") {
+      // se a pessoa mandou mais bolhas enquanto eu respondia, responde de novo.
+      // nunca depois de falha, para nao entrar em loop de retentativa.
+      if (!houveFalha && messages.length && messages[messages.length - 1].role === "user") {
         agendarResposta();
       }
     }
@@ -641,6 +700,7 @@
       conversaId = salvo.id || novoId();
       messages = salvo.messages;
       briefingEnviado = salvo.briefingEnviado === true;
+      dossieUltimoTamanho = messages.length;
       for (var j = 0; j < messages.length; j++) {
         addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user", messages[j].t);
       }
