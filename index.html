@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Maria Clara</title>
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="googlebot" content="noindex, nofollow" />
+  <title>Maria Clara | AI Chief Discovery Officer @ mbetiati.pro</title>
   <style>
     :root {
       --bg: #efe7de; --bar: #f7f4f0; --line: #e2dcd3; --txt: #111b21; --sub: #667781;
@@ -38,6 +40,26 @@
     .clara { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px; }
     .msg a { color: #027eb5; text-decoration: underline; word-break: break-all; }
     body.escuro .msg a { color: #53bdeb; }
+    .msg { position: relative; }
+    .meta { float: right; margin: 6px -4px -4px 10px; font-size: 11px; color: var(--sub);
+      display: inline-flex; align-items: center; gap: 3px; line-height: 1; user-select: none; }
+    .tick { width: 15px; height: 11px; display: inline-block; vertical-align: middle; }
+    .tick svg { width: 100%; height: 100%; display: block; }
+    .tick.lido svg { color: #53bdeb; }
+    .tick:not(.lido) svg { color: var(--sub); }
+    .divisor { align-self: center; background: var(--bar); color: var(--sub); font-size: 12px;
+      padding: 5px 12px; border-radius: 8px; margin: 8px 0; box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+      text-transform: uppercase; letter-spacing: 0.3px; }
+    #emoji { background: none; border: none; color: var(--sub); font-size: 22px; cursor: pointer;
+      padding: 0 4px; line-height: 1; align-self: center; flex-shrink: 0; }
+    #painelEmoji { position: absolute; bottom: 62px; left: 8px; right: 8px; max-width: 340px;
+      background: var(--menu); border: 1px solid var(--line); border-radius: 12px; padding: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22); display: none; z-index: 20;
+      grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 190px; overflow-y: auto; }
+    #painelEmoji.aberto { display: grid; }
+    #painelEmoji button { background: none; border: none; font-size: 21px; cursor: pointer;
+      padding: 5px 0; border-radius: 6px; }
+    #painelEmoji button:hover { background: var(--line); }
     .user { align-self: flex-end; background: var(--bolha-user); border-top-right-radius: 2px; }
     #cargo.digitando { color: #00a884; }
     .typing { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px;
@@ -51,7 +73,7 @@
       30% { transform: translateY(-4px); opacity: 1; }
     }
     #status { display: none; }
-    footer { padding: 8px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+    footer { padding: 8px; display: flex; gap: 6px; align-items: flex-end; flex-shrink: 0; position: relative; }
     #input { flex: 1; padding: 11px 14px; border: none; border-radius: 22px; font-size: 15px;
       background: var(--campo); color: var(--txt); outline: none; resize: none; max-height: 110px;
       font-family: inherit; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -78,7 +100,9 @@
   <div id="chat"></div>
   <div id="status"></div>
   <footer>
-    <textarea id="input" rows="1" placeholder="Mensagem"></textarea>
+    <div id="painelEmoji"></div>
+    <button id="emoji" title="Emojis">&#128522;</button>
+    <textarea id="input" rows="1" placeholder="Digite uma mensagem"></textarea>
     <button id="send">&#10148;</button>
   </footer>
   <script>
@@ -149,18 +173,88 @@
       });
       return t;
     }
-    function addBubble(text, who) {
-      var partes = String(text).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
-      var blocos = partes.length ? partes : [String(text)];
-      var ultimo = null;
-      blocos.forEach(function (parte) {
-        var div = document.createElement("div");
-        div.className = "msg " + who;
-        div.innerHTML = linkificar(parte);
-        chat.appendChild(div);
-        ultimo = div;
-      });
+    // ---- hora, data e checks (estilo WhatsApp) ----
+    function horaDe(ts) {
+      var d = new Date(ts);
+      return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+    }
+    function diaDe(ts) {
+      var d = new Date(ts);
+      return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+    }
+    function rotuloDia(ts) {
+      var hoje = new Date();
+      var ontem = new Date();
+      ontem.setDate(hoje.getDate() - 1);
+      if (diaDe(ts) === diaDe(hoje.getTime())) return "Hoje";
+      if (diaDe(ts) === diaDe(ontem.getTime())) return "Ontem";
+      var d = new Date(ts);
+      return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear();
+    }
+    var ultimoDiaNaTela = "";
+    function garantirDivisor(ts) {
+      var dia = diaDe(ts);
+      if (dia === ultimoDiaNaTela) return;
+      ultimoDiaNaTela = dia;
+      var div = document.createElement("div");
+      div.className = "divisor";
+      div.textContent = rotuloDia(ts);
+      chat.appendChild(div);
+    }
+    var SVG_UM = '<svg viewBox="0 0 16 11" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.6 10.2 1.2 5.8l1.1-1.1 3.3 3.3L13.2.6l1.1 1.1z" fill="currentColor"/></svg>';
+    var SVG_DOIS = '<svg viewBox="0 0 20 11" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.3 10.2.9 5.8 2 4.7l3.3 3.3L12.9.6 14 1.7z" fill="currentColor"/><path d="M10.6 10.2 6.2 5.8l1.1-1.1 3.3 3.3L18.2.6l1.1 1.1z" fill="currentColor"/></svg>';
+    var SVG_RELOGIO = '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.4V8l2.6 1.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+
+    function montarMeta(ts, who) {
+      var meta = document.createElement("span");
+      meta.className = "meta";
+      var hora = document.createElement("span");
+      hora.textContent = horaDe(ts);
+      meta.appendChild(hora);
+      if (who === "user") {
+        var tick = document.createElement("span");
+        tick.className = "tick";
+        tick.innerHTML = SVG_RELOGIO;
+        meta.appendChild(tick);
+      }
+      return meta;
+    }
+    // Estados: relogio (enviando) -> 1 check (enviado) -> 2 checks cinza (entregue) -> 2 checks azuis (lido)
+    function marcarEntregue(bolha) {
+      var t = bolha ? bolha.querySelector(".tick") : null;
+      if (!t) return;
+      t.innerHTML = SVG_UM;
+      setTimeout(function () { t.innerHTML = SVG_DOIS; }, 500);
+    }
+    function marcarTudoLido() {
+      var ticks = chat.querySelectorAll(".user .tick");
+      for (var i = 0; i < ticks.length; i++) {
+        ticks[i].innerHTML = SVG_DOIS;
+        ticks[i].classList.add("lido");
+      }
+    }
+
+    function addBubbleUnico(texto, who, ts) {
+      ts = ts || Date.now();
+      garantirDivisor(ts);
+      var div = document.createElement("div");
+      div.className = "msg " + who;
+      var corpo = document.createElement("span");
+      corpo.innerHTML = linkificar(texto);
+      div.appendChild(corpo);
+      div.appendChild(montarMeta(ts, who));
+      chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
+      return div;
+    }
+    function partirEmBlocos(text) {
+      var partes = String(text).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+      return partes.length ? partes : [String(text)];
+    }
+    function addBubble(text, who, ts) {
+      var blocos = partirEmBlocos(text);
+      var ultimo = null;
+      blocos.forEach(function (parte) { ultimo = addBubbleUnico(parte, who, ts); });
       return ultimo;
     }
     function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -185,6 +279,7 @@
       return div;
     }
     function mostrarDigitando() {
+      marcarTudoLido();
       cargo.textContent = "digitando...";
       cargo.classList.add("digitando");
       return criarBolhaDigitando();
@@ -206,8 +301,9 @@
         var t = mostrarDigitando();
         await esperar(tempoDigitando(baloes[i]));
         esconderDigitando(t);
-        addBubble(baloes[i], "clara");
-        messages.push({ role: "assistant", content: baloes[i] });
+        var agora = Date.now();
+        addBubbleUnico(baloes[i], "clara", agora);
+        messages.push({ role: "assistant", content: baloes[i], t: agora });
         await esperar(320);
       }
       salvarLocal();
@@ -244,8 +340,10 @@
       if (!text) return;
       input.value = "";
       input.style.height = "auto";
-      addBubble(text, "user");
-      messages.push({ role: "user", content: text });
+      var agora = Date.now();
+      var bolha = addBubbleUnico(text, "user", agora);
+      setTimeout(function () { marcarEntregue(bolha); }, 450);
+      messages.push({ role: "user", content: text, t: agora });
       salvarLocal();
       agendarResposta();
     }
@@ -273,12 +371,21 @@
         });
         var data = await res.json();
         if (data.reply) {
-          // cadencia minima proporcional ao tamanho; se a API ja demorou mais, revela na hora
-          var alvo = tempoDigitando(data.reply);
+          // Primeiro balao: respeita a cadencia minima ja contando o tempo que a API levou
+          var blocos = partirEmBlocos(data.reply);
+          var alvo = tempoDigitando(blocos[0]);
           var jaEsperou = Date.now() - inicio;
           if (jaEsperou < alvo) await esperar(alvo - jaEsperou);
           esconderDigitando(typing);
-          addBubble(data.reply, "clara");
+          addBubbleUnico(blocos[0], "clara");
+          // Demais baloes: digitando de novo entre cada um, como na abertura
+          for (var b = 1; b < blocos.length; b++) {
+            await esperar(320);
+            var t2 = mostrarDigitando();
+            await esperar(tempoDigitando(blocos[b]));
+            esconderDigitando(t2);
+            addBubbleUnico(blocos[b], "clara");
+          }
           messages.push({ role: "assistant", content: data.reply });
           salvarLocal();
           salvarDossie();
@@ -298,6 +405,33 @@
         agendarResposta();
       }
     }
+
+    // ---- painel de emojis ----
+    var btnEmoji = document.getElementById("emoji");
+    var painelEmoji = document.getElementById("painelEmoji");
+    var EMOJIS = ["\u{1F600}","\u{1F603}","\u{1F609}","\u{1F60A}","\u{1F60D}","\u{1F602}","\u{1F923}","\u{1F642}",
+      "\u{1F914}","\u{1F44D}","\u{1F44F}","\u{1F64F}","\u{1F4AA}","\u{1F525}","\u{2764}\u{FE0F}","\u{2728}",
+      "\u{1F680}","\u{1F4C8}","\u{1F4A1}","\u{1F3AF}","\u{2705}","\u{1F44C}","\u{1F91D}","\u{1F389}",
+      "\u{1F631}","\u{1F605}","\u{1F614}","\u{1F621}","\u{1F44B}","\u{1F440}","\u{1F4B0}","\u{23F0}"];
+    EMOJIS.forEach(function (e) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = e;
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        input.value = input.value + e;
+        input.focus();
+        input.dispatchEvent(new Event("input"));
+      });
+      painelEmoji.appendChild(b);
+    });
+    btnEmoji.addEventListener("click", function (e) {
+      e.stopPropagation();
+      painelEmoji.classList.toggle("aberto");
+    });
+    painelEmoji.addEventListener("click", function (e) { e.stopPropagation(); });
+    document.addEventListener("click", function () { painelEmoji.classList.remove("aberto"); });
+    input.addEventListener("focus", function () { painelEmoji.classList.remove("aberto"); });
 
     send.addEventListener("click", sendMessage);
     input.addEventListener("keydown", function (e) {
@@ -334,8 +468,9 @@
       messages = salvo.messages;
       briefingEnviado = salvo.briefingEnviado === true;
       for (var j = 0; j < messages.length; j++) {
-        addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user");
+        addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user", messages[j].t);
       }
+      marcarTudoLido();
       chat.scrollTop = chat.scrollHeight;
     } else {
       conversaId = novoId();
