@@ -93,13 +93,14 @@
     var CHAVE = "clara_conversa";
     var messages = [];
     var conversaId = "";
+    var briefingEnviado = false;
 
     function novoId() {
       try { return crypto.randomUUID(); }
       catch (e) { return "c" + Date.now() + Math.random().toString(16).slice(2); }
     }
     function salvarLocal() {
-      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages })); } catch (e) {}
+      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages, briefingEnviado: briefingEnviado })); } catch (e) {}
     }
     function carregarLocal() {
       try { return JSON.parse(localStorage.getItem(CHAVE)); } catch (e) { return null; }
@@ -219,9 +220,13 @@
         var res = await fetch("/api/dossie", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: messages, id: conversaId })
+          body: JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado })
         });
         var data = await res.json();
+        if (data && data.briefingEnviado) {
+          briefingEnviado = true;
+          salvarLocal();
+        }
         status.textContent = data.ok ? "salvo" : "erro ao salvar";
       } catch (err) {
         status.textContent = "erro ao salvar";
@@ -327,6 +332,7 @@
     if (salvo && salvo.messages && salvo.messages.length) {
       conversaId = salvo.id || novoId();
       messages = salvo.messages;
+      briefingEnviado = salvo.briefingEnviado === true;
       for (var j = 0; j < messages.length; j++) {
         addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user");
       }
