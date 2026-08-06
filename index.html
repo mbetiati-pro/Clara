@@ -50,16 +50,33 @@
     .divisor { align-self: center; background: var(--bar); color: var(--sub); font-size: 12px;
       padding: 5px 12px; border-radius: 8px; margin: 8px 0; box-shadow: 0 1px 1px rgba(0,0,0,0.06);
       text-transform: uppercase; letter-spacing: 0.3px; }
-    #emoji { background: none; border: none; color: var(--sub); font-size: 22px; cursor: pointer;
-      padding: 0 4px; line-height: 1; align-self: center; flex-shrink: 0; }
-    #painelEmoji { position: absolute; bottom: 62px; left: 8px; right: 8px; max-width: 340px;
-      background: var(--menu); border: 1px solid var(--line); border-radius: 12px; padding: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.22); display: none; z-index: 20;
-      grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 190px; overflow-y: auto; }
-    #painelEmoji.aberto { display: grid; }
-    #painelEmoji button { background: none; border: none; font-size: 21px; cursor: pointer;
-      padding: 5px 0; border-radius: 6px; }
-    #painelEmoji button:hover { background: var(--line); }
+    #emoji { background: none; border: none; color: var(--sub); cursor: pointer;
+      padding: 0 2px; line-height: 0; align-self: center; flex-shrink: 0; }
+    #emoji svg { width: 26px; height: 26px; display: block; }
+    #painelEmoji { position: absolute; bottom: 60px; left: 8px; right: 8px;
+      background: var(--menu); border: 1px solid var(--line); border-radius: 14px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.22); display: none; z-index: 20; overflow: hidden; }
+    #painelEmoji.aberto { display: block; }
+    #emojiTopo { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+      border-bottom: 1px solid var(--line); }
+    #emojiBusca { flex: 1; background: var(--campo); border: none; border-radius: 16px;
+      padding: 7px 12px; font-size: 14px; color: var(--txt); outline: none; font-family: inherit; }
+    #emojiTopo button { background: none; border: none; color: var(--sub); cursor: pointer;
+      padding: 2px; line-height: 0; }
+    #emojiTopo button svg { width: 21px; height: 21px; display: block; }
+    #emojiGrade { max-height: 230px; overflow-y: auto; padding: 6px 8px 10px; }
+    .emojiTitulo { font-size: 12px; color: var(--sub); text-transform: uppercase;
+      letter-spacing: 0.4px; margin: 8px 4px 4px; }
+    .emojiLinha { display: grid; grid-template-columns: repeat(8, 1fr); gap: 1px; }
+    .emojiLinha button { background: none; border: none; font-size: 23px; cursor: pointer;
+      padding: 5px 0; border-radius: 7px; line-height: 1.15; }
+    .emojiLinha button:hover { background: var(--line); }
+    #emojiAbas { display: flex; border-top: 1px solid var(--line); background: var(--bar); }
+    #emojiAbas button { flex: 1; background: none; border: none; cursor: pointer;
+      padding: 9px 0; color: var(--sub); line-height: 0; border-radius: 0; }
+    #emojiAbas button svg { width: 20px; height: 20px; display: block; margin: 0 auto; }
+    #emojiAbas button.ativa { color: #00a884; background: var(--line); }
+    #emojiVazio { color: var(--sub); font-size: 13px; text-align: center; padding: 24px 10px; }
     .user { align-self: flex-end; background: var(--bolha-user); border-top-right-radius: 2px; }
     #cargo.digitando { color: #00a884; }
     .typing { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px;
@@ -100,8 +117,16 @@
   <div id="chat"></div>
   <div id="status"></div>
   <footer>
-    <div id="painelEmoji"></div>
-    <button id="emoji" title="Emojis">&#128522;</button>
+    <div id="painelEmoji">
+      <div id="emojiTopo">
+        <button id="emojiLupa" title="Buscar" type="button"></button>
+        <input id="emojiBusca" type="text" placeholder="Buscar emoji" />
+        <button id="emojiApagar" title="Apagar" type="button"></button>
+      </div>
+      <div id="emojiGrade"></div>
+      <div id="emojiAbas"></div>
+    </div>
+    <button id="emoji" title="Emojis" type="button"></button>
     <textarea id="input" rows="1" placeholder="Digite uma mensagem"></textarea>
     <button id="send">&#10148;</button>
   </footer>
@@ -182,14 +207,19 @@
       var d = new Date(ts);
       return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
     }
+    var DIAS_SEMANA = ["Domingo", "Segunda-Feira", "Ter\u00e7a-Feira", "Quarta-Feira",
+      "Quinta-Feira", "Sexta-Feira", "S\u00e1bado"];
+    var MESES = ["janeiro", "fevereiro", "mar\u00e7o", "abril", "maio", "junho",
+      "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
     function rotuloDia(ts) {
-      var hoje = new Date();
-      var ontem = new Date();
-      ontem.setDate(hoje.getDate() - 1);
-      if (diaDe(ts) === diaDe(hoje.getTime())) return "Hoje";
-      if (diaDe(ts) === diaDe(ontem.getTime())) return "Ontem";
       var d = new Date(ts);
-      return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + "/" + d.getFullYear();
+      var hoje = new Date();
+      var zera = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+      var diff = Math.round((zera(hoje) - zera(d)) / 86400000);
+      if (diff === 0) return "Hoje";
+      if (diff === 1) return "Ontem";
+      if (diff > 1 && diff < 7) return DIAS_SEMANA[d.getDay()];
+      return d.getDate() + " de " + MESES[d.getMonth()] + " de " + d.getFullYear();
     }
     var ultimoDiaNaTela = "";
     function garantirDivisor(ts) {
@@ -406,32 +436,164 @@
       }
     }
 
-    // ---- painel de emojis ----
+    // ---- painel de emojis (estilo WhatsApp) ----
     var btnEmoji = document.getElementById("emoji");
     var painelEmoji = document.getElementById("painelEmoji");
-    var EMOJIS = ["\u{1F600}","\u{1F603}","\u{1F609}","\u{1F60A}","\u{1F60D}","\u{1F602}","\u{1F923}","\u{1F642}",
-      "\u{1F914}","\u{1F44D}","\u{1F44F}","\u{1F64F}","\u{1F4AA}","\u{1F525}","\u{2764}\u{FE0F}","\u{2728}",
-      "\u{1F680}","\u{1F4C8}","\u{1F4A1}","\u{1F3AF}","\u{2705}","\u{1F44C}","\u{1F91D}","\u{1F389}",
-      "\u{1F631}","\u{1F605}","\u{1F614}","\u{1F621}","\u{1F44B}","\u{1F440}","\u{1F4B0}","\u{23F0}"];
-    EMOJIS.forEach(function (e) {
+    var emojiGrade = document.getElementById("emojiGrade");
+    var emojiAbas = document.getElementById("emojiAbas");
+    var emojiBusca = document.getElementById("emojiBusca");
+
+    var ICO = {
+      carinha: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M8.2 14.5c1 1.3 2.3 2 3.8 2s2.8-.7 3.8-2" stroke-linecap="round"/></svg>',
+      teclado: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M17 10h.01M7 13h.01M9.5 16h5" stroke-linecap="round"/></svg>',
+      lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5" stroke-linecap="round"/></svg>',
+      apagar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5h10a2 2 0 012 2v10a2 2 0 01-2 2H9l-6-7 6-7z"/><path d="M12 10l5 4M17 10l-5 4" stroke-linecap="round"/></svg>',
+      relogio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round"/></svg>',
+      folha: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 19c0-8 5-13 14-13 0 9-5 14-13 13"/><path d="M5 19c3-4 6-6 9-7.5" stroke-linecap="round"/></svg>',
+      xicara: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h12v6a5 5 0 01-5 5H9a5 5 0 01-5-5V8z"/><path d="M16 9.5h2.5a2.5 2.5 0 010 5H16"/></svg>',
+      bola: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M12 7l3.5 2.5-1.3 4h-4.4l-1.3-4z"/><path d="M12 3.5v3.5M4.2 9.8l3.6 2M19.8 9.8l-3.6 2M8 20l1.8-6.5M16 20l-1.8-6.5"/></svg>',
+      carro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3.5 13l1.6-4.6A2 2 0 017 7h10a2 2 0 011.9 1.4L20.5 13v4.5h-17V13z"/><circle cx="7.2" cy="17.5" r="1.6"/><circle cx="16.8" cy="17.5" r="1.6"/></svg>',
+      lampada: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 17.5a6 6 0 116 0v1.5a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 19v-1.5z"/><path d="M10 20.5h4" stroke-linecap="round"/></svg>',
+      nota: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>',
+      bandeira: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 21V4"/><path d="M6 4.5c4-2 7 2 11 0v8c-4 2-7-2-11 0"/></svg>'
+    };
+
+    var EMOJI_CATS = {
+      smileys: "1f600 1f601 1f602 1f603 1f604 1f605 1f606 1f607 1f608 1f609 1f60a 1f60b 1f60c 1f60d 1f60e 1f60f 1f610 1f611 1f612 1f613 1f614 1f615 1f616 1f617 1f618 1f619 1f61a 1f61b 1f61c 1f61d 1f61e 1f61f 1f620 1f621 1f622 1f623 1f624 1f625 1f626 1f627 1f628 1f629 1f62a 1f62b 1f62c 1f62d 1f62e 1f62f 1f630 1f631 1f632 1f633 1f634 1f635 1f636 1f637 1f638 1f639 1f63a 1f63b 1f63c 1f63d 1f63e 1f63f 1f640 1f641 1f642 1f643 1f644 1f645 1f646 1f647 1f648 1f649 1f64a 1f64b 1f64c 1f64d 1f64e 1f64f 1f910 1f911 1f912 1f913 1f914 1f915 1f916 1f917 1f918 1f919 1f91a 1f91b 1f91c 1f91d 1f91e 1f91f 1f920 1f921 1f922 1f923 1f924 1f925 1f926 1f927 1f928 1f929 1f92a 1f92b 1f92c 1f92d 1f92e 1f92f 1f970 1f971 1f972 1f973 1f974 1f975 1f976 1f97a 1f440 1f441 1f442 1f443 1f444 1f445 1f446 1f447 1f448 1f449 1f44a 1f44b 1f44c 1f44d 1f44e 1f44f 1f450 1f4aa",
+      natureza: "1f400 1f401 1f402 1f403 1f404 1f405 1f406 1f407 1f408 1f409 1f40a 1f40b 1f40c 1f40d 1f40e 1f40f 1f410 1f411 1f412 1f413 1f414 1f415 1f416 1f417 1f418 1f419 1f41a 1f41b 1f41c 1f41d 1f41e 1f41f 1f420 1f421 1f422 1f423 1f424 1f425 1f426 1f427 1f428 1f429 1f42a 1f42b 1f42c 1f42d 1f42e 1f42f 1f430 1f431 1f432 1f433 1f434 1f435 1f436 1f437 1f438 1f439 1f43a 1f43b 1f43c 1f43d 1f43e 1f330 1f331 1f332 1f333 1f334 1f335 1f336 1f337 1f338 1f339 1f33a 1f33b 1f33c 1f33d 1f33e 1f33f 1f340 1f341 1f342 1f343 1f344 1f980 1f981 1f982 1f983 1f984 1f985 1f986 1f987 1f988 1f989 1f98a 1f98b 1f98c 1f98d 1f98e 1f98f 1f990 1f991 1f992 1f993 1f994 1f995 1f996 1f997 2600 2601 26a1 1f525 1f31f 2b50 1f308 1f30a",
+      comida: "1f345 1f346 1f347 1f348 1f349 1f34a 1f34b 1f34c 1f34d 1f34e 1f34f 1f350 1f351 1f352 1f353 1f354 1f355 1f356 1f357 1f358 1f359 1f35a 1f35b 1f35c 1f35d 1f35e 1f35f 1f360 1f361 1f362 1f363 1f364 1f365 1f366 1f367 1f368 1f369 1f36a 1f36b 1f36c 1f36d 1f36e 1f36f 1f370 1f371 1f372 1f373 1f374 1f375 1f376 1f377 1f378 1f379 1f37a 1f37b 1f37c 1f37d 1f37e 1f37f 1f950 1f951 1f952 1f953 1f954 1f955 1f956 1f957 1f958 1f959 1f95a 1f95b 1f95c 1f95d 1f95e 1f95f 1f960 1f961 1f962 1f963 1f964 1f965 1f966 1f967 1f968 1f969 1f96a 1f96b 1f96c 1f96d 1f96e 1f96f 2615 1f942 1f943",
+      atividades: "26bd 26be 1f3c0 1f3c1 1f3c2 1f3c3 1f3c4 1f3c6 1f3c7 1f3c8 1f3c9 1f3ca 1f3ae 1f3af 1f3b0 1f3b1 1f3b2 1f3b3 1f3b8 1f3b9 1f3ba 1f3bb 1f3bc 1f3bd 1f3be 1f3c5 1f947 1f948 1f949 1f94a 1f94b 1f3aa 1f3ad 1f3a8 1f3a4 1f3a7 1f3ac 1f939 1f93a 1f3b5 1f3b6",
+      viagem: "1f680 1f681 1f682 1f683 1f684 1f685 1f686 1f687 1f688 1f689 1f68a 1f68b 1f68c 1f68d 1f68e 1f68f 1f690 1f691 1f692 1f693 1f694 1f695 1f696 1f697 1f698 1f699 1f69a 1f69b 1f69c 1f69d 1f69e 1f69f 1f6a0 1f6a1 1f6a2 1f6a3 1f6a4 1f30d 1f30e 1f30f 1f310 1f311 1f312 1f313 1f314 1f315 1f316 1f317 1f318 1f319 1f31a 1f31b 1f31c 1f31d 1f31e 1f31f 1f320 2708 1f5fa 1f3d6 1f3dd 1f3e0 1f3e2 1f3e5 1f3eb 1f3ed",
+      objetos: "1f4a1 1f4a2 1f4a3 1f4a4 1f4a5 1f4a6 1f4a7 1f4a8 1f4a9 1f4aa 1f4ab 1f4ac 1f4ad 1f4ae 1f4af 1f4b0 1f4bb 1f4bc 1f4bd 1f4be 1f4bf 1f4c0 1f4c1 1f4c2 1f4c3 1f4c4 1f4c5 1f4c6 1f4c7 1f4c8 1f4c9 1f4ca 1f4cb 1f4cc 1f4cd 1f4ce 1f527 1f528 1f529 1f52a 1f52b 1f52c 231a 23f0 23f3 1f4de 1f4f1 1f4f7 1f50b 1f50c 1f50d 1f511 1f512 1f513 1f4da 1f4dd 270f",
+      simbolos: "2764 1f9e1 1f49b 1f49a 1f499 1f49c 1f5a4 1f494 1f495 1f496 1f497 1f49d 1f49f 2728 1f4af 1f4a5 1f4a2 1f4a6 1f4a8 1f573 1f4ac 1f4ad 2705 274c 2757 2753 26a0 1f6ab 1f51d 1f519 1f195 1f193 267b 2b06 2b07 27a1 2b05 1f53a 1f53b 1f4b2 1f4b1",
+      bandeiras: "1f1e7-1f1f7 1f1fa-1f1f8 1f1f5-1f1f9 1f1ea-1f1f8 1f1eb-1f1f7 1f1ee-1f1f9 1f1e9-1f1ea 1f1ec-1f1e7 1f1ef-1f1f5 1f1e6-1f1f7 1f1e8-1f1f3 1f1e8-1f1e6 1f1f2-1f1fd 1f1e8-1f1f1 1f1e6-1f1fa 1f1f3-1f1f1 1f1e8-1f1ed 1f1f8-1f1ea 3f3-fe0f 1f3c1 1f6a9 1f38c"
+    };
+
+    var ABAS = [
+      { id: "recentes", nome: "Recentes", ico: ICO.relogio },
+      { id: "smileys", nome: "Smileys e pessoas", ico: ICO.carinha },
+      { id: "natureza", nome: "Animais e natureza", ico: ICO.folha },
+      { id: "comida", nome: "Comida e bebida", ico: ICO.xicara },
+      { id: "atividades", nome: "Atividades", ico: ICO.bola },
+      { id: "viagem", nome: "Viagens e lugares", ico: ICO.carro },
+      { id: "objetos", nome: "Objetos", ico: ICO.lampada },
+      { id: "simbolos", nome: "Simbolos", ico: ICO.nota },
+      { id: "bandeiras", nome: "Bandeiras", ico: ICO.bandeira }
+    ];
+
+    function paraEmoji(codigo) {
+      return codigo.split("-").map(function (p) {
+        return String.fromCodePoint(parseInt(p, 16));
+      }).join("");
+    }
+    function listaDaCat(id) {
+      if (id === "recentes") return recentesEmoji();
+      var s = EMOJI_CATS[id];
+      return s ? s.split(" ") : [];
+    }
+    function recentesEmoji() {
+      try {
+        var r = JSON.parse(localStorage.getItem("clara_emoji_recentes") || "[]");
+        return Array.isArray(r) ? r : [];
+      } catch (e) { return []; }
+    }
+    function guardarRecente(codigo) {
+      var r = recentesEmoji().filter(function (c) { return c !== codigo; });
+      r.unshift(codigo);
+      r = r.slice(0, 24);
+      try { localStorage.setItem("clara_emoji_recentes", JSON.stringify(r)); } catch (e) {}
+    }
+    function inserirEmoji(codigo) {
+      guardarRecente(codigo);
+      input.value = input.value + paraEmoji(codigo);
+      input.dispatchEvent(new Event("input"));
+      input.focus({ preventScroll: true });
+    }
+    function montarGrade(titulo, codigos) {
+      emojiGrade.innerHTML = "";
+      if (!codigos.length) {
+        emojiGrade.innerHTML = '<div id="emojiVazio">Nada por aqui ainda.</div>';
+        return;
+      }
+      var h = document.createElement("div");
+      h.className = "emojiTitulo";
+      h.textContent = titulo;
+      emojiGrade.appendChild(h);
+      var linha = document.createElement("div");
+      linha.className = "emojiLinha";
+      codigos.forEach(function (c) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = paraEmoji(c);
+        b.addEventListener("click", function (ev) { ev.stopPropagation(); inserirEmoji(c); });
+        linha.appendChild(b);
+      });
+      emojiGrade.appendChild(linha);
+      emojiGrade.scrollTop = 0;
+    }
+    var abaAtiva = "smileys";
+    function abrirAba(id) {
+      abaAtiva = id;
+      emojiBusca.value = "";
+      var aba = ABAS.filter(function (a) { return a.id === id; })[0];
+      montarGrade(aba.nome, listaDaCat(id));
+      var bts = emojiAbas.querySelectorAll("button");
+      for (var i = 0; i < bts.length; i++) {
+        bts[i].classList.toggle("ativa", bts[i].dataset.id === id);
+      }
+    }
+    ABAS.forEach(function (a) {
       var b = document.createElement("button");
       b.type = "button";
-      b.textContent = e;
-      b.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        input.value = input.value + e;
-        input.focus();
-        input.dispatchEvent(new Event("input"));
-      });
-      painelEmoji.appendChild(b);
+      b.dataset.id = a.id;
+      b.title = a.nome;
+      b.innerHTML = a.ico;
+      b.addEventListener("click", function (ev) { ev.stopPropagation(); abrirAba(a.id); });
+      emojiAbas.appendChild(b);
     });
-    btnEmoji.addEventListener("click", function (e) {
+    document.getElementById("emojiLupa").innerHTML = ICO.lupa;
+    document.getElementById("emojiApagar").innerHTML = ICO.apagar;
+    document.getElementById("emojiLupa").addEventListener("click", function (e) {
+      e.stopPropagation(); emojiBusca.focus();
+    });
+    document.getElementById("emojiApagar").addEventListener("click", function (e) {
       e.stopPropagation();
-      painelEmoji.classList.toggle("aberto");
+      var v = Array.from(input.value);
+      v.pop();
+      input.value = v.join("");
+      input.dispatchEvent(new Event("input"));
     });
+    emojiBusca.addEventListener("input", function () {
+      var termo = emojiBusca.value.trim().toLowerCase();
+      if (!termo) { abrirAba(abaAtiva); return; }
+      var achados = [];
+      ABAS.forEach(function (a) {
+        if (a.id === "recentes") return;
+        if (a.nome.toLowerCase().indexOf(termo) !== -1) {
+          achados = achados.concat(listaDaCat(a.id));
+        }
+      });
+      montarGrade("Resultados", achados.slice(0, 120));
+    });
+    emojiBusca.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    function alternarPainel() {
+      var abrindo = !painelEmoji.classList.contains("aberto");
+      painelEmoji.classList.toggle("aberto", abrindo);
+      btnEmoji.innerHTML = abrindo ? ICO.teclado : ICO.carinha;
+      if (abrindo) { abrirAba(recentesEmoji().length ? "recentes" : "smileys"); }
+      else { input.focus(); }
+    }
+    btnEmoji.innerHTML = ICO.carinha;
+    btnEmoji.addEventListener("click", function (e) { e.stopPropagation(); alternarPainel(); });
     painelEmoji.addEventListener("click", function (e) { e.stopPropagation(); });
-    document.addEventListener("click", function () { painelEmoji.classList.remove("aberto"); });
-    input.addEventListener("focus", function () { painelEmoji.classList.remove("aberto"); });
+    function fecharPainel() {
+      if (!painelEmoji.classList.contains("aberto")) return;
+      painelEmoji.classList.remove("aberto");
+      btnEmoji.innerHTML = ICO.carinha;
+    }
+    document.addEventListener("click", fecharPainel);
+    input.addEventListener("focus", fecharPainel);
 
     send.addEventListener("click", sendMessage);
     input.addEventListener("keydown", function (e) {
