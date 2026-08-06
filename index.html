@@ -49,7 +49,7 @@
     .tick:not(.lido) svg { color: var(--sub); }
     .divisor { align-self: center; background: var(--bar); color: var(--sub); font-size: 12px;
       padding: 5px 12px; border-radius: 8px; margin: 8px 0; box-shadow: 0 1px 1px rgba(0,0,0,0.06);
-      text-transform: uppercase; letter-spacing: 0.3px; }
+      letter-spacing: 0.2px; }
     #emoji { background: none; border: none; color: var(--sub); cursor: pointer;
       padding: 0 2px; line-height: 0; align-self: center; flex-shrink: 0; }
     #emoji svg { width: 26px; height: 26px; display: block; }
@@ -289,6 +289,18 @@
     }
     function esperar(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+    // Em celular/tablet o foco abre o teclado virtual e come metade da tela.
+    // So devolve o foco automaticamente onde o teclado e fisico (desktop).
+    var TECLADO_VIRTUAL = false;
+    try {
+      TECLADO_VIRTUAL = window.matchMedia("(pointer: coarse)").matches
+        || ("ontouchstart" in window && window.innerWidth < 1180);
+    } catch (e) { TECLADO_VIRTUAL = false; }
+    function focarSePuder() {
+      if (TECLADO_VIRTUAL) return;
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+    }
+
     // Tempo de "digitando" proporcional ao tamanho da mensagem.
     // Humano real digita ~250 ms/letra; aqui uso 35 ms/letra pra simular sem travar a tela.
     function tempoDigitando(texto) {
@@ -337,7 +349,7 @@
         await esperar(320);
       }
       salvarLocal();
-      input.focus();
+      focarSePuder();
     }
 
     async function salvarDossie() {
@@ -429,7 +441,7 @@
       }
       respondendo = false;
       send.disabled = false;
-      input.focus();
+      focarSePuder();
       // se a pessoa mandou mais bolhas enquanto eu respondia, responde de novo
       if (messages.length && messages[messages.length - 1].role === "user") {
         agendarResposta();
@@ -582,7 +594,7 @@
       painelEmoji.classList.toggle("aberto", abrindo);
       btnEmoji.innerHTML = abrindo ? ICO.teclado : ICO.carinha;
       if (abrindo) { abrirAba(recentesEmoji().length ? "recentes" : "smileys"); }
-      else { input.focus(); }
+      else { focarSePuder(); }
     }
     btnEmoji.innerHTML = ICO.carinha;
     btnEmoji.addEventListener("click", function (e) { e.stopPropagation(); alternarPainel(); });
