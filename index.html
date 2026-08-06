@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Maria Clara | AI Chief Discovery Officer @ mbetiati.pro</title>
+  <title>Maria Clara</title>
   <style>
     :root {
       --bg: #efe7de; --bar: #f7f4f0; --line: #e2dcd3; --txt: #111b21; --sub: #667781;
@@ -228,7 +228,13 @@
       }
     }
 
-    async function sendMessage() {
+    // Espera a pessoa terminar de mandar as bolhas antes de responder.
+    // Se ela manda uma correcao logo em seguida, a Clara le tudo junto.
+    var ESPERA_ANTES_DE_RESPONDER = 2200; // ms (ajustavel)
+    var timerResposta = null;
+    var respondendo = false;
+
+    function sendMessage() {
       var text = input.value.trim();
       if (!text) return;
       input.value = "";
@@ -236,6 +242,21 @@
       addBubble(text, "user");
       messages.push({ role: "user", content: text });
       salvarLocal();
+      agendarResposta();
+    }
+
+    function agendarResposta() {
+      if (timerResposta) clearTimeout(timerResposta);
+      timerResposta = setTimeout(function () {
+        timerResposta = null;
+        if (!respondendo) responder();
+      }, ESPERA_ANTES_DE_RESPONDER);
+    }
+
+    async function responder() {
+      // so responde se houver mensagem do usuario pendente
+      if (!messages.length || messages[messages.length - 1].role !== "user") return;
+      respondendo = true;
       send.disabled = true;
       var inicio = Date.now();
       var typing = mostrarDigitando();
@@ -264,8 +285,13 @@
         esconderDigitando(typing);
         addBubble("[erro de conexao] " + err, "clara");
       }
+      respondendo = false;
       send.disabled = false;
       input.focus();
+      // se a pessoa mandou mais bolhas enquanto eu respondia, responde de novo
+      if (messages.length && messages[messages.length - 1].role === "user") {
+        agendarResposta();
+      }
     }
 
     send.addEventListener("click", sendMessage);
@@ -275,6 +301,13 @@
     input.addEventListener("input", function () {
       input.style.height = "auto";
       input.style.height = Math.min(input.scrollHeight, 110) + "px";
+      // Se ha texto no campo, a pessoa esta compondo: segura a resposta.
+      // Se o campo esvaziou (ela enviou ou apagou) e ha mensagem pendente, reinicia a contagem.
+      if (input.value.trim() !== "") {
+        if (timerResposta) { clearTimeout(timerResposta); timerResposta = null; }
+      } else if (!respondendo && messages.length && messages[messages.length - 1].role === "user") {
+        agendarResposta();
+      }
     });
 
     function ajustarAltura() {
