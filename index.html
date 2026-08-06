@@ -36,6 +36,8 @@
     .msg { max-width: 78%; padding: 7px 11px; border-radius: 8px; line-height: 1.45; font-size: 15px;
       white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
     .clara { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px; }
+    .msg a { color: #027eb5; text-decoration: underline; word-break: break-all; }
+    body.escuro .msg a { color: #53bdeb; }
     .user { align-self: flex-end; background: var(--bolha-user); border-top-right-radius: 2px; }
     #cargo.digitando { color: #00a884; }
     .typing { align-self: flex-start; background: var(--bolha-clara); border-top-left-radius: 2px;
@@ -126,6 +128,26 @@
       location.reload();
     });
 
+    function escaparHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function linkificar(texto) {
+      var t = escaparHtml(texto);
+      // Links http/https viram clicaveis (abrem em nova aba)
+      t = t.replace(/(https?:\/\/[^\s<]+)/g, function (u) {
+        var fim = "";
+        var m = u.match(/[.,;:!?)]+$/);
+        if (m) { fim = m[0]; u = u.slice(0, -fim.length); }
+        return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + u + "</a>" + fim;
+      });
+      // WhatsApp (+55 ...) vira link wa.me
+      t = t.replace(/\+?55\s?\(?\d{2}\)?\s?9?\d{4}-?\d{4}/g, function (tel) {
+        var digitos = tel.replace(/\D/g, "");
+        if (digitos.length < 12 || digitos.length > 13) { return tel; }
+        return '<a href="https://wa.me/' + digitos + '" target="_blank" rel="noopener noreferrer">' + tel + "</a>";
+      });
+      return t;
+    }
     function addBubble(text, who) {
       var partes = String(text).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
       var blocos = partes.length ? partes : [String(text)];
@@ -133,7 +155,7 @@
       blocos.forEach(function (parte) {
         var div = document.createElement("div");
         div.className = "msg " + who;
-        div.textContent = parte;
+        div.innerHTML = linkificar(parte);
         chat.appendChild(div);
         ultimo = div;
       });
