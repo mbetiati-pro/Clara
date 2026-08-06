@@ -158,19 +158,21 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
     const model = "gemini-3.6-flash";
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
 
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: instrucaoMestra }] },
-        contents: contents
-      })
+    const corpo = JSON.stringify({
+      systemInstruction: { parts: [{ text: instrucaoMestra }] },
+      contents: contents
     });
 
-    const data = await geminiRes.json();
-    if (!geminiRes.ok) {
-      return res.status(500).json({ error: "Gemini: " + JSON.stringify(data) });
+    const r = await chamarComRetentativa(url, corpo, apiKey);
+
+    if (!r.ok) {
+      console.log("CHAT FALHA status=" + r.status + " tentativas=" + r.tentativas
+        + " detalhe=" + JSON.stringify(r.data).slice(0, 500));
+      return res.status(200).json({ aviso: AVISO_OCUPADA, debug: "status=" + r.status });
     }
+
+    const data = r.data;
+    registrarUso("chat", messages.length, r.tentativas, data);
 
     let reply = "";
     if (data && data.candidates && data.candidates[0] && data.candidates[0].content
@@ -178,11 +180,70 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
       reply = data.candidates[0].content.parts[0].text;
     }
     if (!reply) {
-      return res.status(500).json({ error: "Sem texto na resposta: " + JSON.stringify(data) });
+      console.log("CHAT SEM TEXTO: " + JSON.stringify(data).slice(0, 500));
+      return res.status(200).json({ aviso: AVISO_OCUPADA, debug: "resposta sem texto" });
     }
 
     return res.status(200).json({ reply });
   } catch (err) {
-    return res.status(500).json({ error: "Falha: " + String(err) });
+    console.log("CHAT ERRO: " + String(err));
+    return res.status(200).json({ aviso: AVISO_OCUPADA, debug: String(err) });
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Infra: retentativa com espera progressiva e registro de consumo de token.
+// ---------------------------------------------------------------------------
+
+const AVISO_OCUPADA = "Me perdoa, travei aqui por um instante - tem muita gente falando comigo ao mesmo tempo. Me manda de novo daqui a pouquinho que eu respondo na hora.";
+
+function pausa(ms) {
+  const jitter = Math.floor(Math.random() * 400);
+  return new Promise(function (r) { setTimeout(r, ms + jitter); });
+}
+
+async function chamarComRetentativa(url, corpo, apiKey) {
+  const esperas = [900, 2200, 4800];
+  let ultimo = { ok: false, status: 0, data: {}, tentativas: 0 };
+
+  for (let i = 0; i <= esperas.length; i++) {
+    let resposta = null;
+    let dados = {};
+    try {
+      resposta = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: corpo
+      });
+      dados = await resposta.json();
+    } catch (e) {
+      ultimo = { ok: false, status: 0, data: { erro: String(e) }, tentativas: i + 1 };
+      if (i < esperas.length) { await pausa(esperas[i]); continue; }
+      return ultimo;
+    }
+
+    if (resposta.ok) {
+      return { ok: true, status: 200, data: dados, tentativas: i + 1 };
+    }
+
+    ultimo = { ok: false, status: resposta.status, data: dados, tentativas: i + 1 };
+
+    const valeRetentar = resposta.status === 429 || resposta.status === 500
+      || resposta.status === 502 || resposta.status === 503 || resposta.status === 504;
+    if (!valeRetentar || i === esperas.length) return ultimo;
+
+    await pausa(esperas[i]);
+  }
+  return ultimo;
+}
+
+function registrarUso(qual, tamanho, tentativas, data) {
+  const u = (data && data.usageMetadata) || {};
+  console.log("USO " + qual
+    + " msgs=" + tamanho
+    + " tentativas=" + tentativas
+    + " entrada=" + (u.promptTokenCount || 0)
+    + " saida=" + (u.candidatesTokenCount || 0)
+    + " total=" + (u.totalTokenCount || 0));
 }
