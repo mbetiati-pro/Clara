@@ -22,8 +22,20 @@
     header { background: var(--bar); padding: 10px 12px; display: flex; align-items: center; gap: 12px;
       border-bottom: 1px solid var(--line); position: relative; flex-shrink: 0; }
     #foto { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-      background: #8a8378; color: #fff; display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 600; }
+      background: #8a8378; display: block; cursor: pointer; }
+    #visor { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 60;
+      background: #0b141a; display: none; }
+    #visor.aberto { display: flex; flex-direction: column; }
+    #visorTopo { position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+      display: flex; align-items: center; gap: 20px; padding: 14px 16px; color: #e9edef;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0)); }
+    #visorVoltar { background: none; border: none; color: #e9edef; cursor: pointer;
+      padding: 0; line-height: 0; }
+    #visorVoltar svg { width: 24px; height: 24px; display: block; }
+    #visorNome { font-size: 17px; font-weight: 500; }
+    #visorCorpo { flex: 1; display: flex; align-items: center; justify-content: center;
+      overflow: hidden; padding: 0; }
+    #visorImg { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
     #ident { flex: 1; min-width: 0; }
     #nome-topo { font-size: 16px; font-weight: 600; }
     #cargo { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -101,7 +113,7 @@
 </head>
 <body>
   <header>
-    <div id="foto">MC</div>
+    <img id="foto" src="clara.jpg" alt="Maria Clara" />
     <div id="ident">
       <div id="nome-topo">Maria Clara</div>
       <div id="cargo">AI Chief Discovery Officer @ mbetiati.pro</div>
@@ -114,6 +126,17 @@
       <button id="nova">Nova conversa</button>
     </div>
   </header>
+  <div id="visor">
+    <div id="visorTopo">
+      <button id="visorVoltar" type="button" title="Voltar">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      </button>
+      <div id="visorNome">Maria Clara</div>
+    </div>
+    <div id="visorCorpo">
+      <img id="visorImg" src="clara.jpg" alt="Maria Clara" />
+    </div>
+  </div>
   <div id="chat"></div>
   <div id="status"></div>
   <footer>
@@ -176,6 +199,31 @@
       if (!confirm("Comecar uma conversa nova? A atual sera apagada deste aparelho.")) return;
       try { localStorage.removeItem(CHAVE); } catch (e) {}
       location.reload();
+    });
+
+    var foto = document.getElementById("foto");
+    var visor = document.getElementById("visor");
+    var visorImg = document.getElementById("visorImg");
+    function abrirVisor() {
+      if (visor.classList.contains("aberto")) return;
+      visor.classList.add("aberto");
+      menu.classList.remove("aberto");
+      try { history.pushState({ visor: 1 }, ""); } catch (e) {}
+    }
+    function fecharVisor(usarHistorico) {
+      if (!visor.classList.contains("aberto")) return;
+      visor.classList.remove("aberto");
+      if (usarHistorico !== false) {
+        try { if (history.state && history.state.visor) { history.back(); } } catch (e) {}
+      }
+    }
+    foto.addEventListener("click", function (e) { e.stopPropagation(); abrirVisor(); });
+    document.getElementById("visorVoltar").addEventListener("click", function () { fecharVisor(); });
+    document.getElementById("visorCorpo").addEventListener("click", function () { fecharVisor(); });
+    visorImg.addEventListener("click", function (e) { e.stopPropagation(); });
+    window.addEventListener("popstate", function () { fecharVisor(false); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { fecharVisor(); }
     });
 
     function escaparHtml(s) {
