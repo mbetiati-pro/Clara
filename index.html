@@ -167,6 +167,32 @@
     var conversaId = "";
     var briefingEnviado = false;
 
+    // ---- origem: de onde essa pessoa chegou ----
+    // /palco, /totem e /nfc caem no mesmo index.html via rewrite no vercel.json.
+    // A URL nao muda, entao o caminho identifica a porta de entrada.
+    // Vale o primeiro toque: quem entrou pelo totem continua totem se voltar depois.
+    var CHAVE_ORIGEM = "clara_origem";
+    var PORTAS = { "/palco": "palco", "/totem": "totem", "/nfc": "nfc" };
+
+    function detectarOrigem() {
+      var caminho = location.pathname.replace(/\/+$/, "").toLowerCase();
+      var nova = PORTAS[caminho] || "";
+      if (!nova) {
+        try {
+          var p = new URLSearchParams(location.search);
+          nova = (p.get("origem") || p.get("utm_source") || "").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24);
+        } catch (e) {}
+      }
+      var salva = "";
+      try { salva = localStorage.getItem(CHAVE_ORIGEM) || ""; } catch (e) {}
+      if (nova && !salva) {
+        try { localStorage.setItem(CHAVE_ORIGEM, nova); } catch (e) {}
+        salva = nova;
+      }
+      return salva || nova || "direto";
+    }
+    var origem = detectarOrigem();
+
     function novoId() {
       try { return crypto.randomUUID(); }
       catch (e) { return "c" + Date.now() + Math.random().toString(16).slice(2); }
@@ -431,7 +457,7 @@
         var res = await fetch("/api/dossie", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado })
+          body: JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado, origem: origem })
         });
         var data = await res.json();
         if (data && data.ok) { dossieUltimoTamanho = tamanhoNoEnvio; }
@@ -450,7 +476,7 @@
     function salvarDossieAoSair() {
       if (!precisaSalvarDossie()) return;
       try {
-        var corpo = JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado });
+        var corpo = JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado, origem: origem });
         var pacote = new Blob([corpo], { type: "application/json" });
         if (navigator.sendBeacon && navigator.sendBeacon("/api/dossie", pacote)) {
           dossieUltimoTamanho = messages.length;
@@ -759,5 +785,8 @@
       abrirConversa();
     }
   </script>
+  <!-- Vercel Web Analytics: conta visita por caminho (/palco, /totem, /nfc).
+       Precisa estar ligado no painel do projeto em Vercel > Analytics. -->
+  <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
