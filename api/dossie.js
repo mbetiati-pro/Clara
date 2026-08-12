@@ -15,6 +15,7 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const messages = body.messages;
     const id = body.id || "";
+    const origem = String(body.origem || "direto").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24) || "direto";
     const briefingJaEnviado = body.briefingEnviado === true;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -93,6 +94,7 @@ export default async function handler(req, res) {
 
     const linha = {
       id: id,
+      origem: origem,
       nome: campo(dossie.nome),
       email: campo(dossie.email),
       whatsapp: campo(dossie.whatsapp),
