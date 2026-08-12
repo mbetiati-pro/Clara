@@ -4,5 +4,10 @@
     "api/*.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/palco", "destination": "/index.html" },
+    { "source": "/totem", "destination": "/index.html" },
+    { "source": "/nfc", "destination": "/index.html" }
+  ]
 }
