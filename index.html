@@ -458,6 +458,7 @@
     // O fim e o momento mais fragil que existe: aba fechando, tela travando,
     // app sendo morto pelo sistema. O lead precisa entrar antes disso.
     var contatoGravado = false;
+    var ultimaGravacaoAuto = 0;
     var PADRAO_EMAIL = /[^\s@]+@[^\s@.]+\.[a-z]{2,}/i;
 
     function gatilhosDeGravacao(texto) {
@@ -465,11 +466,17 @@
       // Espera um pouco pra Clara confirmar e grava com a pagina viva.
       if (!contatoGravado && PADRAO_EMAIL.test(texto)) {
         contatoGravado = true;
+        ultimaGravacaoAuto = messages.length;
         setTimeout(function () { salvarDossie(false); }, 8000);
         return;
       }
-      // Rede de seguranca, a cada 10 mensagens.
-      if (messages.length >= 10 && messages.length % 10 === 0) {
+      // Rede de seguranca: a cada 10 mensagens novas desde a ultima gravacao.
+      // Conta por DIFERENCA, nao por resto de divisao. Esta funcao so roda
+      // logo depois de uma mensagem da pessoa, e nesse instante o array tem
+      // sempre tamanho impar (a conversa abre com 4 baloes e depois alterna),
+      // entao testar multiplo de 10 nunca daria verdadeiro.
+      if (messages.length - ultimaGravacaoAuto >= 10) {
+        ultimaGravacaoAuto = messages.length;
         salvarDossie(false);
       }
     }
