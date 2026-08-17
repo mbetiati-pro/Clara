@@ -163,7 +163,8 @@ export default async function handler(req, res) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + process.env.RESEND_API_KEY
+            "Authorization": "Bearer " + process.env.RESEND_API_KEY,
+            "Idempotency-Key": "briefing-" + id
           },
           body: JSON.stringify({
             from: "Maria Clara <clara@send.mariaclara.ai>",
@@ -209,13 +210,17 @@ async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
     "Escreva essa analise agora, falando DIRETAMENTE com a pessoa, em portugues do Brasil, na segunda pessoa (voce). " +
     "Responda SOMENTE com um JSON valido, sem texto antes ou depois, com exatamente estas chaves: " +
     "assunto (a linha de assunto do e-mail: curta, concreta e especifica do negocio DELA - nunca algo generico como 'sua analise' ou 'nossa conversa'), " +
-    "saudacao (uma linha, comecando com 'Ola, ' e o primeiro nome dela), " +
+    "nome (SO o primeiro nome da pessoa, sem sobrenome, sem saudacao e sem pontuacao), " +
     "retrato (2 a 4 paragrafos devolvendo com clareza a empreitada dela, o que ela definiu como sucesso e o sinal de pronto, usando as PALAVRAS dela sempre que possivel), " +
     "insight (OBRIGATORIO e a parte mais importante: um angulo NOVO, que NAO foi dito na conversa. " +
     "Uma leitura, um risco silencioso ou uma oportunidade que a conversa nao alcancou. De 1 a 3 paragrafos. " +
     "Isto foi prometido a ela, entao tem que ser conteudo de verdade e nao um resumo requentado do que ja foi falado), " +
     "proximo (o paragrafo de fechamento). " +
     fecho + " " +
+    "ACENTUACAO (regra critica): esta instrucao que voce esta lendo foi escrita SEM acentos por uma limitacao tecnica do arquivo. " +
+    "NAO copie esse estilo. O e-mail que voce escrever tem que sair em portugues do Brasil com ortografia e ACENTUACAO COMPLETAS E CORRETAS " +
+    "em todas as chaves do JSON, inclusive no assunto: voce, analise, operacao, atencao, sao, ja, tambem, alem, e assim por diante. " +
+    "Texto sem acento passa desleixo e derruba a confianca antes da pessoa chegar no conteudo. " +
     "REGRAS DURAS: nada de bajulacao nem elogio inflado - reconhecimento so ancorado em algo concreto que ela disse. " +
     "Use SEMPRE o vocabulario do mundo dela e NUNCA importe jargao de outro ramo; jamais fale de paciente ou consultorio com quem nao e da saude. " +
     "Nao use travessao longo, use hifen. Nao use asterisco, negrito, marcador nem numeracao. " +
@@ -237,6 +242,7 @@ async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
 
   const a = extrairJson(r.data);
   if (!a || !a.insight || !a.retrato) return null;
+  if (!a.nome) a.nome = "";
   return a;
 }
 
@@ -304,16 +310,24 @@ function paragrafos(texto) {
 }
 
 function montarEmailAnalise(a) {
+  const primeiro = String(a.nome || "").trim().split(/\s+/)[0] || "";
+  const abertura = primeiro
+    ? "Ol\u00e1, " + esc(primeiro) + "!<br>Tudo bom?"
+    : "Ol\u00e1!<br>Tudo bom?";
+
   return "" +
   '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;color:#111b21;line-height:1.6;max-width:600px;margin:0 auto;padding:8px">' +
-  '<p style="margin:0 0 16px 0">' + esc(a.saudacao || "Ol\u00e1") + "</p>" +
+  '<p style="margin:0 0 16px 0">' + abertura + "</p>" +
   paragrafos(a.retrato) +
   '<div style="border-left:3px solid #00674f;padding-left:16px;margin:0 0 16px 0">' +
   paragrafos(a.insight) +
   "</div>" +
   paragrafos(a.proximo) +
+  '<p style="margin:0 0 16px 0">Muito obrigada!</p>' +
+  '<p style="margin:0 0 16px 0">Abra\u00e7os,<br>Maria Clara<br>' +
+  '<a href="https://mariaclara.ai" style="color:#00674f">mariaclara.ai</a></p>' +
   '<p style="margin:24px 0 0 0;color:#667781;font-size:13px;line-height:1.5;border-top:1px solid #e2dcd3;padding-top:14px">' +
-  "Maria Clara, s\u00f3cia de IA do Marcos Betiati.<br>" +
+  "Maria Clara, sou uma IA e s\u00f3cia do Marcos Betiati.<br>" +
   "Escrevi esta an\u00e1lise a partir da conversa que tivemos em mariaclara.ai.</p>" +
   "</div>";
 }
