@@ -166,6 +166,7 @@
     var messages = [];
     var conversaId = "";
     var briefingEnviado = false;
+    var analiseAgendada = false;
 
     // ---- origem: de onde essa pessoa chegou ----
     // /palco, /totem e /nfc caem no mesmo index.html via rewrite no vercel.json.
@@ -198,7 +199,7 @@
       catch (e) { return "c" + Date.now() + Math.random().toString(16).slice(2); }
     }
     function salvarLocal() {
-      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages, briefingEnviado: briefingEnviado })); } catch (e) {}
+      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages, briefingEnviado: briefingEnviado, analiseAgendada: analiseAgendada })); } catch (e) {}
     }
     function carregarLocal() {
       try { return JSON.parse(localStorage.getItem(CHAVE)); } catch (e) { return null; }
@@ -430,8 +431,10 @@
     // Antes: rodava a cada resposta da Clara (cerca de 30 chamadas por conversa).
     // Agora: quando a conversa fica parada, quando a pessoa sai da aba,
     // e na hora em que a Clara manda o link de pagamento.
-    var TEMPO_OCIOSO_DOSSIE = 90000; // 90 segundos sem atividade
+    var TEMPO_OCIOSO_DOSSIE = 90000;   // 90 segundos sem atividade: salva o dossie
+    var TEMPO_ENCERRANDO = 480000;     // 8 minutos sem atividade: conversa acabou
     var timerDossie = null;
+    var timerEncerrando = null;
     var dossieEnviando = false;
     var dossieUltimoTamanho = 0;
 
@@ -439,30 +442,49 @@
       if (timerDossie) clearTimeout(timerDossie);
       timerDossie = setTimeout(function () {
         timerDossie = null;
-        salvarDossie();
+        salvarDossie(false);
       }, TEMPO_OCIOSO_DOSSIE);
+
+      // Segundo relogio, bem mais longo. Se a pessoa sumiu de vez com a aba
+      // aberta, e a hora de tratar a conversa como encerrada e liberar a analise.
+      if (timerEncerrando) clearTimeout(timerEncerrando);
+      timerEncerrando = setTimeout(function () {
+        timerEncerrando = null;
+        salvarDossie(true);
+      }, TEMPO_ENCERRANDO);
     }
 
-    function precisaSalvarDossie() {
+    function precisaSalvarDossie(encerrando) {
       if (messages.length < 6) return false;
+      // No encerramento vale reenviar mesmo sem mensagem nova: e o unico
+      // momento em que a analise da pessoa pode ser agendada.
+      if (encerrando && !analiseAgendada && messages.length >= 8) return true;
       if (messages.length === dossieUltimoTamanho) return false;
       return true;
     }
 
-    async function salvarDossie() {
-      if (!precisaSalvarDossie() || dossieEnviando) return;
+    async function salvarDossie(encerrando) {
+      if (!precisaSalvarDossie(encerrando) || dossieEnviando) return;
       dossieEnviando = true;
       var tamanhoNoEnvio = messages.length;
       try {
         var res = await fetch("/api/dossie", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado, origem: origem })
+          body: JSON.stringify({
+            messages: messages,
+            id: conversaId,
+            briefingEnviado: briefingEnviado,
+            analiseAgendada: analiseAgendada,
+            encerrando: encerrando === true,
+            origem: origem
+          })
         });
         var data = await res.json();
         if (data && data.ok) { dossieUltimoTamanho = tamanhoNoEnvio; }
-        if (data && data.briefingEnviado) {
-          briefingEnviado = true;
+        if (data && (data.briefingEnviado || data.analiseAgendada)) {
+          if (data.briefingEnviado) briefingEnviado = true;
+          if (data.analiseAgendada) analiseAgendada = true;
           salvarLocal();
         }
         status.textContent = (data && data.ok) ? "salvo" : "erro ao salvar";
@@ -473,10 +495,19 @@
     }
 
     // Ao fechar ou minimizar a aba: manda de uma vez so, sem esperar resposta.
+    // Este e o sinal mais confiavel de que a conversa acabou, entao vai com
+    // encerrando = true e a analise da pessoa pode ser agendada aqui.
     function salvarDossieAoSair() {
-      if (!precisaSalvarDossie()) return;
+      if (!precisaSalvarDossie(true)) return;
       try {
-        var corpo = JSON.stringify({ messages: messages, id: conversaId, briefingEnviado: briefingEnviado, origem: origem });
+        var corpo = JSON.stringify({
+          messages: messages,
+          id: conversaId,
+          briefingEnviado: briefingEnviado,
+          analiseAgendada: analiseAgendada,
+          encerrando: true,
+          origem: origem
+        });
         var pacote = new Blob([corpo], { type: "application/json" });
         if (navigator.sendBeacon && navigator.sendBeacon("/api/dossie", pacote)) {
           dossieUltimoTamanho = messages.length;
@@ -551,7 +582,7 @@
           salvarLocal();
           // Fechou: link de pagamento na tela. Grava e dispara o briefing na hora.
           if (String(data.reply).indexOf("asaas.com/c/") !== -1) {
-            salvarDossie();
+            salvarDossie(true);
           } else {
             agendarDossie();
           }
@@ -774,6 +805,7 @@
       conversaId = salvo.id || novoId();
       messages = salvo.messages;
       briefingEnviado = salvo.briefingEnviado === true;
+      analiseAgendada = salvo.analiseAgendada === true;
       dossieUltimoTamanho = messages.length;
       for (var j = 0; j < messages.length; j++) {
         addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user", messages[j].t);
