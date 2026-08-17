@@ -498,6 +498,10 @@
     // Este e o sinal mais confiavel de que a conversa acabou, entao vai com
     // encerrando = true e a analise da pessoa pode ser agendada aqui.
     function salvarDossieAoSair() {
+      // Se uma gravacao ja esta em voo (tipico depois do link de pagamento),
+      // nao dispare outra: as duas chegariam juntas no servidor e virariam
+      // duas linhas na planilha com o mesmo ID.
+      if (dossieEnviando) return;
       if (!precisaSalvarDossie(true)) return;
       try {
         var corpo = JSON.stringify({
