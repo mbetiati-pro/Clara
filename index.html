@@ -454,6 +454,26 @@
       }, TEMPO_ENCERRANDO);
     }
 
+    // Gatilhos que NAO dependem do fim da conversa.
+    // O fim e o momento mais fragil que existe: aba fechando, tela travando,
+    // app sendo morto pelo sistema. O lead precisa entrar antes disso.
+    var contatoGravado = false;
+    var PADRAO_EMAIL = /[^\s@]+@[^\s@.]+\.[a-z]{2,}/i;
+
+    function gatilhosDeGravacao(texto) {
+      // O lead passa a existir no instante em que a pessoa entrega o e-mail.
+      // Espera um pouco pra Clara confirmar e grava com a pagina viva.
+      if (!contatoGravado && PADRAO_EMAIL.test(texto)) {
+        contatoGravado = true;
+        setTimeout(function () { salvarDossie(false); }, 8000);
+        return;
+      }
+      // Rede de seguranca, a cada 10 mensagens.
+      if (messages.length >= 10 && messages.length % 10 === 0) {
+        salvarDossie(false);
+      }
+    }
+
     function precisaSalvarDossie(encerrando) {
       if (messages.length < 6) return false;
       // No encerramento vale reenviar mesmo sem mensagem nova: e o unico
@@ -503,19 +523,44 @@
       // duas linhas na planilha com o mesmo ID.
       if (dossieEnviando) return;
       if (!precisaSalvarDossie(true)) return;
+      var corpo = JSON.stringify({
+        messages: messages,
+        id: conversaId,
+        briefingEnviado: briefingEnviado,
+        analiseAgendada: analiseAgendada,
+        encerrando: true,
+        origem: origem
+      });
+
+      // Caminho principal: fetch com keepalive. Sobrevive a pagina sendo
+      // descarregada E devolve resposta, entao da pra saber se gravou mesmo.
+      // O contador so avanca com o ok do servidor - antes ele avancava so
+      // porque o sendBeacon aceitou enfileirar, o que mascarava a falha e
+      // ainda travava a proxima tentativa.
       try {
-        var corpo = JSON.stringify({
-          messages: messages,
-          id: conversaId,
-          briefingEnviado: briefingEnviado,
-          analiseAgendada: analiseAgendada,
-          encerrando: true,
-          origem: origem
-        });
+        fetch("/api/dossie", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: corpo,
+          keepalive: true
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.ok) { dossieUltimoTamanho = messages.length; }
+            if (data && (data.briefingEnviado || data.analiseAgendada)) {
+              if (data.briefingEnviado) briefingEnviado = true;
+              if (data.analiseAgendada) analiseAgendada = true;
+              salvarLocal();
+            }
+          })
+          .catch(function () {});
+        return;
+      } catch (e) {}
+
+      // Ultimo recurso, se o navegador nao aceitar keepalive.
+      try {
         var pacote = new Blob([corpo], { type: "application/json" });
-        if (navigator.sendBeacon && navigator.sendBeacon("/api/dossie", pacote)) {
-          dossieUltimoTamanho = messages.length;
-        }
+        if (navigator.sendBeacon) { navigator.sendBeacon("/api/dossie", pacote); }
       } catch (e) {}
     }
     document.addEventListener("visibilitychange", function () {
@@ -541,6 +586,7 @@
       salvarLocal();
       agendarResposta();
       agendarDossie();
+      gatilhosDeGravacao(text);
     }
 
     function agendarResposta() {
