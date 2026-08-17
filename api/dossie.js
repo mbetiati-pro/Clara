@@ -1,5 +1,6 @@
-// Gera o dossie da conversa, grava/atualiza a linha na planilha do Google
-// e, quando a pessoa fecha o Plano, dispara o briefing por e-mail para o Marcos.
+// Gera o dossie da conversa, grava/atualiza a linha na planilha do Google,
+// agenda a analise de clareza para a pessoa (Resend) e, quando ela fecha o Plano,
+// dispara o briefing por e-mail para o Marcos.
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -17,6 +18,8 @@ export default async function handler(req, res) {
     const id = body.id || "";
     const origem = String(body.origem || "direto").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24) || "direto";
     const briefingJaEnviado = body.briefingEnviado === true;
+    const analiseJaAgendada = body.analiseAgendada === true;
+    const encerrando = body.encerrando === true;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Sem conversa para resumir." });
@@ -51,6 +54,9 @@ export default async function handler(req, res) {
       "proporcao (o tamanho do negocio hoje: faturamento, volume ou porte, para dimensionar o salto), " +
       "qualificacao (leitura de poder de decisao, se tem processo desenhado e prontidao), " +
       "ofertou (responda so 'sim' ou 'nao': a Maria Clara chegou a oferecer o Plano?), " +
+      "prioridade (SO o numero de 1 a 5, sem texto: o quanto vale o Marcos gastar tempo com esta pessoa. " +
+      "5 = decide sozinha, dor clara, urgencia real e porte que comporta o investimento. " +
+      "1 = nao decide, sem dor definida, ou porte incompativel. Seja severo: 5 e raro e a maioria fica em 2 ou 3), " +
       "leitura (a leitura estrategica: por onde o Marcos deve puxar, o gancho mais forte), " +
       "lacunas (liste o que ficou faltando ou raso e o Marcos precisa investigar na primeira reuniao). " +
       "IMPORTANTE: nos campos sucesso, pronto, temQue, naoPode e fracasso, registre APENAS o que a PROPRIA PESSOA " +
@@ -73,24 +79,41 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, motivo: "gemini indisponivel" });
     }
 
-    const data = r.data;
-    registrarUso("dossie", messages.length, r.tentativas, data);
-
-    let texto = "{}";
-    if (data && data.candidates && data.candidates[0] && data.candidates[0].content
-        && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-      texto = data.candidates[0].content.parts[0].text || "{}";
-    }
-    texto = texto.replace(/```json/g, "").replace(/```/g, "").trim();
-
-    let dossie;
-    try {
-      dossie = JSON.parse(texto);
-    } catch (e) {
-      dossie = { leitura: "Bruto: " + texto };
-    }
+    registrarUso("dossie", messages.length, r.tentativas, r.data);
+    const dossie = extrairJson(r.data);
 
     function campo(v) { return v || ""; }
+
+    // -----------------------------------------------------------------------
+    // Analise de clareza para a PESSOA. So sai quando a conversa acabou de
+    // verdade (aba fechada, inatividade longa, ou venda fechada), so uma vez,
+    // e so se tiver e-mail valido.
+    // -----------------------------------------------------------------------
+    let analiseAgendadaAgora = false;
+    let analisePara = "";
+    const emailPessoa = limparEmail(campo(dossie.email));
+    const podeAgendar = (encerrando || fechou)
+      && !analiseJaAgendada
+      && emailPessoa
+      && messages.length >= 8
+      && process.env.RESEND_API_KEY;
+
+    if (podeAgendar) {
+      try {
+        const analise = await gerarAnalise(transcricao, fechou, url, apiKey, messages.length);
+        if (analise) {
+          const quando = calcularAgendamento(origem);
+          const enviado = await agendarAnalise(analise, emailPessoa, quando, id);
+          if (enviado) {
+            analiseAgendadaAgora = true;
+            analisePara = formatarBR(quando);
+            console.log("ANALISE AGENDADA id=" + id + " origem=" + origem + " para=" + quando);
+          }
+        }
+      } catch (e) {
+        console.log("ANALISE FALHA id=" + id + " erro=" + String(e).slice(0, 300));
+      }
+    }
 
     const linha = {
       id: id,
@@ -109,7 +132,9 @@ export default async function handler(req, res) {
       proporcao: campo(dossie.proporcao),
       qualificacao: campo(dossie.qualificacao),
       ofertou: campo(dossie.ofertou),
+      prioridade: campo(dossie.prioridade),
       fechou: fechou ? "SIM" : "",
+      analise: analisePara,
       leitura: campo(dossie.leitura),
       lacunas: campo(dossie.lacunas),
       transcricao: transcricao
@@ -157,11 +182,146 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Falha ao gravar na planilha. Status: " + sheetRes.status });
     }
 
-    return res.status(200).json({ ok: true, fechou: fechou, briefingEnviado: briefingEnviado });
+    return res.status(200).json({
+      ok: true,
+      fechou: fechou,
+      briefingEnviado: briefingEnviado,
+      analiseAgendada: analiseAgendadaAgora
+    });
   } catch (err) {
     return res.status(500).json({ error: "Falha: " + String(err) });
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// A analise de clareza que vai para a PESSOA.
+// ---------------------------------------------------------------------------
+
+async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
+  const fecho = fechou
+    ? "A pessoa JA FECHOU o Plano com o Marcos. No campo 'proximo', de as boas-vindas com sobriedade e diga que o Marcos entra em contato pelo WhatsApp para agendar as duas reunioes. NAO venda nada de novo e NAO repita preco."
+    : "A pessoa NAO fechou o Plano. No campo 'proximo', feche reconhecendo o que ela ja construiu na conversa e deixe UMA porta aberta, curta e sem pressao: se ela quiser destravar isso com o Marcos, e so responder este e-mail. Uma frase, no maximo duas. NAO repita preco, NAO reapresente o formato do Plano e NAO insista.";
+
+  const instrucao =
+    "Voce e a Maria Clara, socia de IA do Marcos Betiati. Voce acabou de conversar com um dono de negocio " +
+    "e prometeu mandar por escrito uma analise de clareza do negocio dele, com um angulo que nao coube na conversa. " +
+    "Escreva essa analise agora, falando DIRETAMENTE com a pessoa, em portugues do Brasil, na segunda pessoa (voce). " +
+    "Responda SOMENTE com um JSON valido, sem texto antes ou depois, com exatamente estas chaves: " +
+    "assunto (a linha de assunto do e-mail: curta, concreta e especifica do negocio DELA - nunca algo generico como 'sua analise' ou 'nossa conversa'), " +
+    "saudacao (uma linha, comecando com 'Ola, ' e o primeiro nome dela), " +
+    "retrato (2 a 4 paragrafos devolvendo com clareza a empreitada dela, o que ela definiu como sucesso e o sinal de pronto, usando as PALAVRAS dela sempre que possivel), " +
+    "insight (OBRIGATORIO e a parte mais importante: um angulo NOVO, que NAO foi dito na conversa. " +
+    "Uma leitura, um risco silencioso ou uma oportunidade que a conversa nao alcancou. De 1 a 3 paragrafos. " +
+    "Isto foi prometido a ela, entao tem que ser conteudo de verdade e nao um resumo requentado do que ja foi falado), " +
+    "proximo (o paragrafo de fechamento). " +
+    fecho + " " +
+    "REGRAS DURAS: nada de bajulacao nem elogio inflado - reconhecimento so ancorado em algo concreto que ela disse. " +
+    "Use SEMPRE o vocabulario do mundo dela e NUNCA importe jargao de outro ramo; jamais fale de paciente ou consultorio com quem nao e da saude. " +
+    "Nao use travessao longo, use hifen. Nao use asterisco, negrito, marcador nem numeracao. " +
+    "Nao invente numero, prazo, dado ou fato que a pessoa nao tenha dito. " +
+    "Se a conversa foi curta e voce tem pouca coisa, escreva menos: texto inflado para parecer entrega e pior que texto curto e honesto.";
+
+  const corpo = JSON.stringify({
+    systemInstruction: { parts: [{ text: instrucao }] },
+    contents: [{ role: "user", parts: [{ text: transcricao }] }],
+    generationConfig: { responseMimeType: "application/json" }
+  });
+
+  const r = await chamarComRetentativa(url, corpo, apiKey);
+  if (!r.ok) {
+    console.log("ANALISE GEMINI FALHA status=" + r.status + " tentativas=" + r.tentativas);
+    return null;
+  }
+  registrarUso("analise", qtdMensagens, r.tentativas, r.data);
+
+  const a = extrairJson(r.data);
+  if (!a || !a.insight || !a.retrato) return null;
+  return a;
+}
+
+// Origem de evento recebe a analise a noite, quando a pessoa esta em condicao de ler.
+// Origem direta recebe em 1 hora, com a conversa ainda quente.
+function calcularAgendamento(origem) {
+  const EVENTO = { palco: 1, totem: 1, nfc: 1 };
+  const agora = Date.now();
+
+  if (!EVENTO[origem]) {
+    return new Date(agora + 3600000).toISOString();
+  }
+
+  const OFFSET = 3 * 3600000; // Brasilia = UTC-3
+  const br = new Date(agora - OFFSET); // os campos UTC deste objeto sao a hora de Brasilia
+  let alvo;
+  if (br.getUTCHours() < 19) {
+    alvo = Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), br.getUTCDate(), 20, 30, 0) + OFFSET;
+  } else {
+    alvo = Date.UTC(br.getUTCFullYear(), br.getUTCMonth(), br.getUTCDate() + 1, 9, 0, 0) + OFFSET;
+  }
+  if (alvo - agora < 600000) alvo = agora + 600000; // nunca menos de 10 minutos
+  return new Date(alvo).toISOString();
+}
+
+async function agendarAnalise(a, para, quando, id) {
+  const pacote = {
+    from: "Maria Clara <clara@send.mariaclara.ai>",
+    to: [para],
+    subject: String(a.assunto || "Sobre o que a gente conversou").slice(0, 120),
+    scheduled_at: quando,
+    html: montarEmailAnalise(a)
+  };
+  if (process.env.EMAIL_DESTINO) {
+    pacote.bcc = [process.env.EMAIL_DESTINO];
+    pacote.reply_to = process.env.EMAIL_DESTINO;
+  }
+
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + process.env.RESEND_API_KEY,
+      "Idempotency-Key": "analise-" + id
+    },
+    body: JSON.stringify(pacote)
+  });
+
+  if (!r.ok) {
+    let detalhe = "";
+    try { detalhe = JSON.stringify(await r.json()).slice(0, 300); } catch (e) {}
+    console.log("RESEND ANALISE FALHA status=" + r.status + " " + detalhe);
+    return false;
+  }
+  return true;
+}
+
+function paragrafos(texto) {
+  return String(texto == null ? "" : texto)
+    .split(/\n+/)
+    .map(function (t) { return t.trim(); })
+    .filter(function (t) { return t.length > 0; })
+    .map(function (t) { return '<p style="margin:0 0 16px 0">' + esc(t) + "</p>"; })
+    .join("");
+}
+
+function montarEmailAnalise(a) {
+  return "" +
+  '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;color:#111b21;line-height:1.6;max-width:600px;margin:0 auto;padding:8px">' +
+  '<p style="margin:0 0 16px 0">' + esc(a.saudacao || "Ol\u00e1") + "</p>" +
+  paragrafos(a.retrato) +
+  '<div style="border-left:3px solid #00674f;padding-left:16px;margin:0 0 16px 0">' +
+  paragrafos(a.insight) +
+  "</div>" +
+  paragrafos(a.proximo) +
+  '<p style="margin:24px 0 0 0;color:#667781;font-size:13px;line-height:1.5;border-top:1px solid #e2dcd3;padding-top:14px">' +
+  "Maria Clara, s\u00f3cia de IA do Marcos Betiati.<br>" +
+  "Escrevi esta an\u00e1lise a partir da conversa que tivemos em mariaclara.ai.</p>" +
+  "</div>";
+}
+
+
+// ---------------------------------------------------------------------------
+// Briefing interno para o Marcos.
+// ---------------------------------------------------------------------------
 
 function esc(s) {
   return String(s == null ? "" : s)
@@ -197,6 +357,7 @@ function montarEmail(l) {
   '<h3 style="border-bottom:1px solid #e2dcd3;padding-bottom:6px">Para a reuniao</h3>' +
   bloco("Leitura estrategica", l.leitura) +
   bloco("Qualificacao", l.qualificacao) +
+  bloco("Prioridade (1 a 5)", l.prioridade) +
   bloco("Lacunas a investigar", l.lacunas) +
   '<h3 style="border-bottom:1px solid #e2dcd3;padding-bottom:6px">Transcricao integral</h3>' +
   '<pre style="white-space:pre-wrap;font-family:inherit;background:#f7f4f0;padding:14px;border-radius:8px">' +
@@ -209,7 +370,32 @@ function montarEmail(l) {
 // Infra: retentativa com espera progressiva e registro de consumo de token.
 // ---------------------------------------------------------------------------
 
-const AVISO_OCUPADA = "Me perdoa, travei aqui por um instante - tem muita gente falando comigo ao mesmo tempo. Me manda de novo daqui a pouquinho que eu respondo na hora.";
+function limparEmail(valor) {
+  const t = String(valor || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(t)) return "";
+  return t;
+}
+
+function formatarBR(iso) {
+  const d = new Date(new Date(iso).getTime() - 3 * 3600000);
+  function dd(n) { return (n < 10 ? "0" : "") + n; }
+  return dd(d.getUTCDate()) + "/" + dd(d.getUTCMonth() + 1) + "/" + d.getUTCFullYear()
+    + " " + dd(d.getUTCHours()) + ":" + dd(d.getUTCMinutes());
+}
+
+function extrairJson(data) {
+  let texto = "{}";
+  if (data && data.candidates && data.candidates[0] && data.candidates[0].content
+      && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+    texto = data.candidates[0].content.parts[0].text || "{}";
+  }
+  texto = texto.replace(/```json/g, "").replace(/```/g, "").trim();
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    return { leitura: "Bruto: " + texto };
+  }
+}
 
 function pausa(ms) {
   const jitter = Math.floor(Math.random() * 400);
