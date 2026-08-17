@@ -84,37 +84,6 @@ export default async function handler(req, res) {
 
     function campo(v) { return v || ""; }
 
-    // -----------------------------------------------------------------------
-    // Analise de clareza para a PESSOA. So sai quando a conversa acabou de
-    // verdade (aba fechada, inatividade longa, ou venda fechada), so uma vez,
-    // e so se tiver e-mail valido.
-    // -----------------------------------------------------------------------
-    let analiseAgendadaAgora = false;
-    let analisePara = "";
-    const emailPessoa = limparEmail(campo(dossie.email));
-    const podeAgendar = (encerrando || fechou)
-      && !analiseJaAgendada
-      && emailPessoa
-      && messages.length >= 8
-      && process.env.RESEND_API_KEY;
-
-    if (podeAgendar) {
-      try {
-        const analise = await gerarAnalise(transcricao, fechou, url, apiKey, messages.length);
-        if (analise) {
-          const quando = calcularAgendamento(origem);
-          const enviado = await agendarAnalise(analise, emailPessoa, quando, id);
-          if (enviado) {
-            analiseAgendadaAgora = true;
-            analisePara = formatarBR(quando);
-            console.log("ANALISE AGENDADA id=" + id + " origem=" + origem + " para=" + quando);
-          }
-        }
-      } catch (e) {
-        console.log("ANALISE FALHA id=" + id + " erro=" + String(e).slice(0, 300));
-      }
-    }
-
     const linha = {
       id: id,
       origem: origem,
@@ -134,7 +103,7 @@ export default async function handler(req, res) {
       ofertou: campo(dossie.ofertou),
       prioridade: campo(dossie.prioridade),
       fechou: fechou ? "SIM" : "",
-      analise: analisePara,
+      analise: "",
       leitura: campo(dossie.leitura),
       lacunas: campo(dossie.lacunas),
       transcricao: transcricao
@@ -176,6 +145,52 @@ export default async function handler(req, res) {
         briefingEnviado = mailRes.ok;
       } catch (e) {
         briefingEnviado = false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Analise de clareza para a PESSOA.
+    // Roda DEPOIS de gravar a planilha, e de proposito: a linha e o ativo
+    // principal e nao pode depender de uma segunda chamada ao Gemini nem do
+    // Resend. Se qualquer coisa aqui falhar ou demorar, o lead ja esta salvo.
+    // So dispara quando a conversa acabou de verdade (aba fechada, inatividade
+    // longa ou venda fechada), so uma vez, e so com e-mail valido.
+    // -----------------------------------------------------------------------
+    let analiseAgendadaAgora = false;
+    const emailPessoa = limparEmail(campo(dossie.email));
+    const podeAgendar = (encerrando || fechou)
+      && !analiseJaAgendada
+      && emailPessoa
+      && messages.length >= 8
+      && process.env.RESEND_API_KEY;
+
+    if (podeAgendar) {
+      try {
+        const analise = await gerarAnalise(transcricao, fechou, url, apiKey, messages.length);
+        if (analise) {
+          const quando = calcularAgendamento(origem);
+          const enviado = await agendarAnalise(analise, emailPessoa, quando, id);
+          if (enviado) {
+            analiseAgendadaAgora = true;
+            console.log("ANALISE AGENDADA id=" + id + " origem=" + origem + " para=" + quando);
+
+            // Segunda gravacao, so pra registrar o horario na coluna Analise.
+            // Se falhar, paciencia: o lead ja esta na planilha e o e-mail ja
+            // esta agendado no Resend.
+            try {
+              linha.analise = formatarBR(quando);
+              await fetch(sheetsUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(linha)
+              });
+            } catch (e) {
+              console.log("ANALISE sem registro na planilha id=" + id);
+            }
+          }
+        }
+      } catch (e) {
+        console.log("ANALISE FALHA id=" + id + " erro=" + String(e).slice(0, 300));
       }
     }
 
