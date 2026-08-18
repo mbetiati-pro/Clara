@@ -612,15 +612,15 @@
       var link = await linkNovoDePagamento();
       if (link) {
         falaDaClara("Mas fique tranquilo, acesse novamente o " + link
-          + " para refazer o seu pagamento via Pix ou Cartao.");
+          + " para refazer o seu pagamento via Pix ou Cart\u00e3o.");
       } else {
-        falaDaClara("Me avisa por aqui que eu gero um link novo pra voce.");
+        falaDaClara("Me avisa por aqui que eu gero um link novo pra voc\u00ea.");
       }
     }
 
     async function tratarVoltaDoPagamento(situacao) {
       if (situacao === "cancel" || situacao === "exp") {
-        await ofereceLinkNovo("Vi que o pagamento nao foi concluido.");
+        await ofereceLinkNovo("Vi que o pagamento n\u00e3o foi conclu\u00eddo.");
         return;
       }
 
@@ -631,7 +631,7 @@
         var pago = await consultarPagamento();
         if (pago === "SIM") {
           falaDaClara("Muito obrigada, acabei de receber o seu pagamento. Em breve, o Marcos ("
-            + ZAP_MARCOS + ") entrara em contato com voce atraves do WhatsApp.");
+            + ZAP_MARCOS + ") entrar\u00e1 em contato com voc\u00ea atrav\u00e9s do WhatsApp.");
           return;
         }
         if (pago === "RECUSADO") {
@@ -641,7 +641,7 @@
         await esperar(3000);
       }
 
-      falaDaClara("Muito obrigada! O pagamento esta em confirmacao e costuma levar poucos minutos. "
+      falaDaClara("Muito obrigada! O pagamento est\u00e1 em confirma\u00e7\u00e3o e costuma levar poucos minutos. "
         + "Assim que entrar, o Marcos (" + ZAP_MARCOS + ") te chama no WhatsApp.");
     }
 
