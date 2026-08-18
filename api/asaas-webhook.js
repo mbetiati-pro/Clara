@@ -20,10 +20,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    const esperado = process.env.ASAAS_WEBHOOK_TOKEN;
-    const recebido = req.headers["asaas-access-token"];
-    if (!esperado || recebido !== esperado) {
-      console.log("WEBHOOK RECUSADO token invalido ou ausente");
+    const esperado = String(process.env.ASAAS_WEBHOOK_TOKEN || "");
+    const recebido = String(req.headers["asaas-access-token"] || "");
+
+    // Compara sem espacos nas pontas: colar valor no painel costuma trazer
+    // um espaco ou quebra de linha invisivel junto, e isso sozinho derruba
+    // toda a integracao sem deixar pista.
+    if (!esperado || recebido.trim() !== esperado.trim()) {
+      // Nunca imprime o token. So os tamanhos e os cabecalhos recebidos, que
+      // e o suficiente pra separar as tres causas possiveis:
+      // esperado=0  -> a variavel nao existe nesse deploy
+      // recebido=0  -> o Asaas nao esta mandando o cabecalho
+      // ambos > 0   -> os valores sao mesmo diferentes
+      console.log("WEBHOOK RECUSADO"
+        + " tamanho_esperado=" + esperado.length
+        + " tamanho_recebido=" + recebido.length
+        + " cabecalhos=" + Object.keys(req.headers || {}).filter(function (h) {
+            return h.indexOf("asaas") !== -1 || h.indexOf("token") !== -1;
+          }).join(","));
       return res.status(401).json({ error: "nao autorizado" });
     }
 
