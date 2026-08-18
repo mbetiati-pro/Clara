@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       },
       items: [{
         name: NOME_ITEM,
-        description: "Duas reuni\u00f5es online com o Marcos Betiati e a entrega do plano em at\u00e9 10 dias \u00fateis.",
+        description: "Duas reuni\u00f5es online com o Marcos Betiati e a entrega do plano em at\u00e9 10 dias \u00fateis em uma reuni\u00e3o online.",
         quantity: 1,
         value: VALOR
       }],
