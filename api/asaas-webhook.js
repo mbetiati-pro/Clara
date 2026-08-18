@@ -30,11 +30,17 @@ export default async function handler(req, res) {
     const body = req.body || {};
     const evento = String(body.event || "");
     const pagamento = body.payment || body.checkout || {};
-    const ref = String(pagamento.externalReference || "").trim();
 
-    if (!ref) {
+    // O Asaas Checkout NAO propaga o externalReference para a cobranca gerada:
+    // no objeto payment ele vem null. O que liga o pagamento a conversa e o
+    // checkoutSession, que e o mesmo id que o checkout.js gravou na coluna
+    // Cobranca. Por isso a busca tem dois caminhos.
+    const ref = String(pagamento.externalReference || "").trim();
+    const sessao = String(pagamento.checkoutSession || pagamento.id || "").trim();
+
+    if (!ref && !sessao) {
       console.log("WEBHOOK SEM REFERENCIA evento=" + evento);
-      return res.status(200).json({ ok: true, ignorado: "sem externalReference" });
+      return res.status(200).json({ ok: true, ignorado: "sem referencia nem checkoutSession" });
     }
 
     let pago = "";
@@ -45,11 +51,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, ignorado: evento });
     }
 
-    const linha = {
-      id: ref,
-      pago: pago,
-      cobranca: String(pagamento.id || "")
-    };
+    // Com externalReference, casa pelo id da conversa. Sem ele, casa pela
+    // coluna Cobranca usando o checkoutSession.
+    const linha = ref
+      ? { id: ref, pago: pago, cobranca: sessao }
+      : { cobranca: sessao, pago: pago };
 
     const url = process.env.SHEETS_URL;
     if (url) {
@@ -65,7 +71,8 @@ export default async function handler(req, res) {
       } catch (e) {
         ok = false;
       }
-      console.log("WEBHOOK " + evento + " id=" + ref + " pago=" + pago + " planilha=" + (ok ? "ok" : "FALHOU"));
+      console.log("WEBHOOK " + evento + " ref=" + (ref || "-") + " sessao=" + (sessao || "-")
+        + " pago=" + pago + " planilha=" + (ok ? "ok" : "FALHOU"));
     }
 
     return res.status(200).json({ ok: true });
