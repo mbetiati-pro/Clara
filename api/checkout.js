@@ -7,7 +7,12 @@
 // expira em no maximo 24 horas, entao gerar um link novo e o comportamento
 // esperado quando a pessoa volta depois ou avisa que o link expirou.
 
-const VALOR = 3907;
+// Valor padrao do Plano. So muda se existir VALOR_PLANO no ambiente, e isso
+// existe para um proposito unico: testar o fluxo real de pagamento em producao
+// gastando R$ 1 em vez de R$ 3.907. APAGUE a variavel depois do teste - o
+// padrao volta sozinho para 3907 e o log abaixo avisa enquanto ela estiver la.
+const VALOR_PADRAO = 3907;
+const VALOR = Number(process.env.VALOR_PLANO) > 0 ? Number(process.env.VALOR_PLANO) : VALOR_PADRAO;
 const NOME_ITEM = "Plano de IA para Neg\u00f3cios";
 const MAX_PARCELAS = 3;
 const MINUTOS_VALIDADE = 1440; // teto do Asaas
@@ -81,7 +86,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, motivo: "asaas recusou" });
     }
 
-    console.log("CHECKOUT CRIADO id=" + id + " checkout=" + dados.id + " expira_em=" + MINUTOS_VALIDADE + "min");
+    console.log("CHECKOUT CRIADO id=" + id + " checkout=" + dados.id
+      + " valor=" + VALOR + " expira_em=" + MINUTOS_VALIDADE + "min"
+      + (VALOR !== VALOR_PADRAO ? "  *** ATENCAO: VALOR_PLANO ativo, valor de teste ***" : ""));
 
     // Guarda o id do checkout na planilha. Payload parcial: o Apps Script
     // preserva as colunas que nao vierem preenchidas.
