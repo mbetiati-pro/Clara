@@ -570,6 +570,92 @@
         if (navigator.sendBeacon) { navigator.sendBeacon("/api/dossie", pacote); }
       } catch (e) {}
     }
+    // ------------------------------------------------------------------
+    // Volta do checkout do Asaas.
+    // Quem confirma pagamento e o webhook, nunca o retorno da guia: no cartao
+    // a cobranca pode cair em analise de risco e ser recusada depois. Por isso
+    // aqui a gente PERGUNTA ao servidor em vez de assumir que deu certo.
+    // ------------------------------------------------------------------
+    var ZAP_MARCOS = "+55 11 97822-6365";
+
+    function falaDaClara(texto) {
+      var agora = Date.now();
+      addBubble(texto, "clara", agora);
+      messages.push({ role: "assistant", content: texto, t: agora });
+      salvarLocal();
+    }
+
+    async function consultarPagamento() {
+      try {
+        var r = await fetch("/api/status?id=" + encodeURIComponent(conversaId));
+        var d = await r.json();
+        if (d && d.ok) return String(d.pago || "");
+      } catch (e) {}
+      return "";
+    }
+
+    async function linkNovoDePagamento() {
+      try {
+        var r = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: conversaId, origem: origem })
+        });
+        var d = await r.json();
+        if (d && d.ok && d.link) return d.link;
+      } catch (e) {}
+      return "";
+    }
+
+    async function ofereceLinkNovo(primeiroBalao) {
+      falaDaClara(primeiroBalao);
+      var link = await linkNovoDePagamento();
+      if (link) {
+        falaDaClara("Mas fique tranquilo, acesse novamente o " + link
+          + " para refazer o seu pagamento via Pix ou Cartao.");
+      } else {
+        falaDaClara("Me avisa por aqui que eu gero um link novo pra voce.");
+      }
+    }
+
+    async function tratarVoltaDoPagamento(situacao) {
+      if (situacao === "cancel" || situacao === "exp") {
+        await ofereceLinkNovo("Vi que o pagamento nao foi concluido.");
+        return;
+      }
+
+      // pg=ok: a pessoa terminou o fluxo, mas quem diz se caiu e o webhook.
+      // Espera um pouco e pergunta algumas vezes, porque no Pix a confirmacao
+      // costuma levar segundos.
+      for (var i = 0; i < 5; i++) {
+        var pago = await consultarPagamento();
+        if (pago === "SIM") {
+          falaDaClara("Muito obrigada, acabei de receber o seu pagamento. Em breve, o Marcos ("
+            + ZAP_MARCOS + ") entrara em contato com voce atraves do WhatsApp.");
+          return;
+        }
+        if (pago === "RECUSADO") {
+          await ofereceLinkNovo("Ops! Parece que seu pagamento foi recusado pelo banco.");
+          return;
+        }
+        await esperar(3000);
+      }
+
+      falaDaClara("Muito obrigada! O pagamento esta em confirmacao e costuma levar poucos minutos. "
+        + "Assim que entrar, o Marcos (" + ZAP_MARCOS + ") te chama no WhatsApp.");
+    }
+
+    (function verificarVoltaDoPagamento() {
+      var p = new URLSearchParams(window.location.search).get("pg");
+      if (!p) return;
+      // Limpa a URL na hora: se a pessoa recarregar a pagina depois, a mensagem
+      // nao pode aparecer de novo.
+      try {
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch (e) {}
+      setTimeout(function () { tratarVoltaDoPagamento(p); }, 1200);
+    })();
+
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "hidden") salvarDossieAoSair();
     });
@@ -616,7 +702,7 @@
         var res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: messages })
+          body: JSON.stringify({ messages: messages, id: conversaId, origem: origem })
         });
         var data = await res.json();
         if (data.reply) {
@@ -638,7 +724,7 @@
           messages.push({ role: "assistant", content: data.reply });
           salvarLocal();
           // Fechou: link de pagamento na tela. Grava e dispara o briefing na hora.
-          if (String(data.reply).indexOf("asaas.com/c/") !== -1) {
+          if (/asaas\.com\/(c\/|checkoutSession)/.test(String(data.reply))) {
             salvarDossie(true);
           } else {
             agendarDossie();
