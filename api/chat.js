@@ -162,9 +162,10 @@ SÓ VIRA NÃO quando: ela recusar de forma explícita ("não quero", "agora não
 O FECHAMENTO (assim que a pessoa topar fechar, NÃO redescreva o formato - vá direto, uma coisa por mensagem)
 1. Comemore com sobriedade. O WhatsApp e o e-mail você JÁ TEM da captura - NÃO peça de novo, isso irrita e passa desorganização. Só se a pessoa tiver recusado antes é que você pede agora, um dado por mensagem.
 2. Confirme a forma de pagamento SÓ se ainda não estiver clara ("cartão em 3x de R$ 1.302, ou Pix à vista de R$ 3.907?"). Se a pessoa já topou o cartão lá na oferta, não repergunte.
-3. Mande só o link certo, sozinho:
-   - Cartão até 3x: https://www.asaas.com/c/4ji8cjr1v4qpbvhz
-   - Pix à vista: https://www.asaas.com/c/dm1eoh4edtdbhwsm
+3. Mande o link de pagamento sozinho, num balão só. Para isso, escreva EXATAMENTE este marcador, sem nada colado nele: [LINK_PAGAMENTO]
+   O sistema troca o marcador pelo link real antes de a pessoa ver. NUNCA escreva um endereço de pagamento por conta própria, NUNCA invente URL e NUNCA repita um link antigo que já apareceu na conversa.
+   Na mesma mensagem, avise que na página ela escolhe entre Pix à vista e cartão em até 3x, e que o link vale por 24 horas.
+   SE A PESSOA DISSER QUE O LINK EXPIROU, não deu certo ou não abre: escreva o marcador [LINK_PAGAMENTO] de novo, que um link novo é gerado na hora. Não peça desculpa longa nem explique o mecanismo - só mande o novo.
 4. Feche dizendo que, assim que o pagamento for confirmado, o próprio Marcos entra em contato pelo WhatsApp +55 11 97822-6365 pra agendar. Agradeça com calor, sem exagero.
 CONTRATO E NOTA FISCAL (se a pessoa perguntar - responda curto e firme, sem prometer detalhe que você não controla): sim, é tudo formal. Tem contrato de prestação de serviços, que o Marcos envia junto com o agendamento. A nota fiscal é emitida assim que o pagamento é confirmado, e os dados pra emissão o Marcos coleta na primeira conversa. NÃO invente prazo, valor de imposto, condição de reembolso, cláusula ou qualquer detalhe jurídico: se perguntarem além disso, diga com naturalidade que esses pontos o Marcos alinha direto no envio do contrato.
 NUNCA peça dado de cartão na conversa; o pagamento acontece só no link. Você coleta apenas e-mail e WhatsApp.
@@ -174,7 +175,7 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
 `;
 
   try {
-    const { messages } = req.body || {};
+    const { messages, id, origem } = req.body || {};
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: "Formato invalido: falta 'messages'." });
     }
@@ -210,6 +211,22 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
     if (!reply) {
       console.log("CHAT SEM TEXTO: " + JSON.stringify(data).slice(0, 500));
       return res.status(200).json({ aviso: AVISO_OCUPADA, debug: "resposta sem texto" });
+    }
+
+    // A Clara escreve um marcador em vez de um link. O link real e criado aqui,
+    // no servidor: assim a conversa nunca carrega URL de pagamento inventada, e
+    // cada envio gera uma cobranca nova e valida (o checkout do Asaas expira em
+    // 24h, entao reaproveitar link antigo entregaria pagina morta).
+    if (reply.indexOf(MARCADOR_PAGAMENTO) !== -1) {
+      const link = await criarCheckout(req, id, origem);
+      if (link) {
+        reply = reply.split(MARCADOR_PAGAMENTO).join(link);
+      } else {
+        // Sem link, a pior saida e mandar o marcador cru pra pessoa.
+        reply = reply.split(MARCADOR_PAGAMENTO).join(
+          "tive um problema pra gerar o link agora - me avisa que eu mando em seguida");
+        console.log("CHAT SEM LINK id=" + (id || "-"));
+      }
     }
 
     return res.status(200).json({ reply });
@@ -274,4 +291,27 @@ function registrarUso(qual, tamanho, tentativas, data) {
     + " entrada=" + (u.promptTokenCount || 0)
     + " saida=" + (u.candidatesTokenCount || 0)
     + " total=" + (u.totalTokenCount || 0));
+}
+
+
+const MARCADOR_PAGAMENTO = "[LINK_PAGAMENTO]";
+
+// Chama o proprio /api/checkout. Mantem a criacao da cobranca num lugar so,
+// entao valor, parcelamento e validade nao ficam duplicados em dois arquivos.
+async function criarCheckout(req, id, origem) {
+  if (!id) return "";
+  try {
+    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+    if (!host) return "";
+    const r = await fetch("https://" + host + "/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, origem: origem || "direto" })
+    });
+    const d = await r.json();
+    return (d && d.ok && d.link) ? String(d.link) : "";
+  } catch (e) {
+    console.log("CHAT CHECKOUT ERRO " + String(e).slice(0, 200));
+    return "";
+  }
 }
