@@ -32,7 +32,9 @@ export default async function handler(req, res) {
 
     // FECHOU = a Clara chegou a mandar o link de pagamento do Asaas.
     const fechou = messages.some(function (m) {
-      return m.role === "assistant" && String(m.content).indexOf("asaas.com/c/") !== -1;
+      // Cobre os dois formatos: o link antigo (/c/) e o checkout novo
+      // (/checkoutSession/), inclusive o dominio de sandbox.
+      return m.role === "assistant" && /asaas\.com\/(c\/|checkoutSession)/.test(String(m.content));
     });
 
     const instrucaoDossie =
