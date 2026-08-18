@@ -138,7 +138,7 @@ Se você perceber que a conversa está morrendo antes de chegar na síntese - re
 A OFERTA (só depois da síntese, da faísca criativa e da captura do contato, com o portão fechado)
 Ancore no que conversaram e ofereça a DIREÇÃO primeiro, SEM preço ainda. Pode vir em 2-3 balões curtos, a última fala sempre puxa a decisão - nunca pare numa descrição solta. Conteúdo:
 - Nomeie ANTES de referenciar. NUNCA use "esse passo", "seria uma análise" ou "nele" sem antes dizer, com sujeito claro, o que é a coisa. A pessoa não sabe do que você está falando até você nomear.
-- Balão 1, nomeia: "Diante do que a gente alinhou aqui, o que eu recomendo é o Plano: uma análise do seu [negócio, no vocabulário dela] e a construção de um plano sob medida, com o Marcos."
+- Balão 1, nomeia: "Diante do que a gente alinhou aqui, o que eu recomendo é a construção de um Plano. Uma análise do seu [negócio, no vocabulário dela] e a construção de um plano sob medida, com o Marcos."
 - Balão 2, o formato: "O Plano funciona assim: duas reuniões de 1h30 online com o Marcos, e a entrega em até 10 dias úteis numa terceira reunião online."
 - Balão 3, o conteúdo: "No plano, o Marcos desenha com você o mapa de como as coisas rodam hoje, o indicador que mede o seu sucesso, os recursos que você vai precisar, os riscos a blindar e o passo a passo. É a fundação do que vem depois."
 - Feche a direção com: "Você acha que faz sentido acionar o Marcos?"
@@ -222,9 +222,13 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
       if (link) {
         reply = reply.split(MARCADOR_PAGAMENTO).join(link);
       } else {
-        // Sem link, a pior saida e mandar o marcador cru pra pessoa.
-        reply = reply.split(MARCADOR_PAGAMENTO).join(
-          "tive um problema pra gerar o link agora - me avisa que eu mando em seguida");
+        // Sem link, corta tudo que vem DEPOIS do marcador. O que vem depois
+        // fala da pagina de pagamento, dos valores e do que acontece ao pagar -
+        // e sem link nada disso existe. Deixar aquele texto no ar e pior que o
+        // proprio erro: a pessoa fica esperando uma coisa que nao chegou.
+        reply = reply.split(MARCADOR_PAGAMENTO)[0].trim()
+          + "\n\nTive um problema aqui pra gerar o seu link de pagamento agora. "
+          + "Me avisa que eu gero de novo e te mando em seguida.";
         console.log("CHAT SEM LINK id=" + (id || "-"));
       }
     }
@@ -298,7 +302,7 @@ const MARCADOR_PAGAMENTO = "[LINK_PAGAMENTO]";
 
 // Chama o proprio /api/checkout. Mantem a criacao da cobranca num lugar so,
 // entao valor, parcelamento e validade nao ficam duplicados em dois arquivos.
-async function criarCheckout(req, id, origem) {
+async function tentarCheckout(req, id, origem) {
   if (!id) return "";
   try {
     const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
@@ -314,4 +318,15 @@ async function criarCheckout(req, id, origem) {
     console.log("CHAT CHECKOUT ERRO " + String(e).slice(0, 200));
     return "";
   }
+}
+
+// Uma retentativa antes de desistir. Falhar na geracao do link bem no momento
+// do fechamento custa caro demais pra nao tentar de novo.
+async function criarCheckout(req, id, origem) {
+  const primeira = await tentarCheckout(req, id, origem);
+  if (primeira) return primeira;
+  await new Promise(function (r) { setTimeout(r, 1200); });
+  const segunda = await tentarCheckout(req, id, origem);
+  if (!segunda) console.log("CHECKOUT falhou nas duas tentativas id=" + (id || "-"));
+  return segunda;
 }
