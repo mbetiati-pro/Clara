@@ -8,7 +8,7 @@
 // esperado quando a pessoa volta depois ou avisa que o link expirou.
 
 const VALOR = 3907;
-const NOME_ITEM = "Plano de IA para Neg\u00f3cios";
+const NOME_ITEM = "Planejamento para Neg\u00f3cios";
 const MAX_PARCELAS = 3;
 const MINUTOS_VALIDADE = 1440; // teto do Asaas
 
@@ -27,17 +27,12 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: "Conversa sem id." });
 
     const origem = String(body.origem || "direto").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    const volta = "https://mariaclara.ai/" + (origem && origem !== "direto" ? origem : "");
 
-    // O Asaas so aceita os campos que existirem. A Clara tem nome, e-mail e
-    // WhatsApp; o CPF quem pede e a pagina do Asaas, na hora do pagamento.
-    const cliente = {};
-    if (body.nome) cliente.name = String(body.nome).slice(0, 100);
-    if (body.email) cliente.email = String(body.email).slice(0, 120);
-    if (body.whatsapp) {
-      const fone = String(body.whatsapp).replace(/\D/g, "");
-      if (fone.length >= 10) cliente.phone = fone.slice(-11);
-    }
+    // O dominio de retorno vem do host da propria requisicao, nao de texto fixo.
+    // Se voltar pra mariaclara.ai quando a conversa rodou em www.mariaclara.ai,
+    // o localStorage e outro e a pessoa cai numa conversa vazia depois de pagar.
+    const host = String(req.headers["x-forwarded-host"] || req.headers.host || "www.mariaclara.ai");
+    const volta = "https://" + host + "/" + (origem && origem !== "direto" ? origem : "");
 
     const pacote = {
       billingTypes: ["PIX", "CREDIT_CARD"],
@@ -57,7 +52,13 @@ export default async function handler(req, res) {
       }],
       installment: { maxInstallmentCount: MAX_PARCELAS }
     };
-    if (Object.keys(cliente).length > 0) pacote.customerData = cliente;
+
+    // customerData fica de FORA de proposito. Ele e opcional e serve so pra
+    // pre-preencher o checkout. Mandando parcial (so nome, e-mail e telefone),
+    // o Asaas passa a exigir o cadastro completo: cpfCnpj, address,
+    // addressNumber, postalCode e province. Nada disso a Clara tem, e pedir
+    // CPF e endereco no meio da conversa seria fricção e dado sensivel sem
+    // necessidade. Sem o objeto, a pagina do Asaas coleta o que precisar.
 
     const r = await fetch(base + "/checkouts", {
       method: "POST",
