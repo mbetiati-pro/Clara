@@ -13,7 +13,7 @@
 // padrao volta sozinho para 3907 e o log abaixo avisa enquanto ela estiver la.
 const VALOR_PADRAO = 3907;
 const VALOR = Number(process.env.VALOR_PLANO) > 0 ? Number(process.env.VALOR_PLANO) : VALOR_PADRAO;
-const NOME_ITEM = "Plano de IA para Neg\u00f3cios";
+const NOME_ITEM = "Planejamento para Neg\u00f3cios";
 const MAX_PARCELAS = 3;
 const MINUTOS_VALIDADE = 1440; // teto do Asaas
 
