@@ -624,31 +624,50 @@
       }
     }
 
+    function avisoPagamentoRecebido() {
+      return "Muito obrigada, acabei de receber o seu pagamento. Em breve, o Marcos ("
+        + ZAP_MARCOS + ") entrar\u00e1 em contato com voc\u00ea atrav\u00e9s do WhatsApp.";
+    }
+
     async function tratarVoltaDoPagamento(situacao) {
       if (situacao === "cancel" || situacao === "exp") {
         await ofereceLinkNovo("Vi que o pagamento n\u00e3o foi conclu\u00eddo.");
         return;
       }
 
-      // pg=ok: a pessoa terminou o fluxo, mas quem diz se caiu e o webhook.
-      // Espera um pouco e pergunta algumas vezes, porque no Pix a confirmacao
-      // costuma levar segundos.
-      for (var i = 0; i < 5; i++) {
+      // pg=ok: a pessoa terminou o fluxo, mas quem diz se o dinheiro caiu e o
+      // webhook, nunca o retorno da guia.
+      //
+      // FASE 1 - resposta rapida. A pessoa esta olhando a tela AGORA; deixar
+      // ela em silencio e o jeito mais certo de perde-la. No maximo 10s aqui.
+      var limiteRapido = Date.now() + 10000;
+      while (Date.now() < limiteRapido) {
         var pago = await consultarPagamento();
-        if (pago === "SIM") {
-          await falaDaClara("Muito obrigada, acabei de receber o seu pagamento. Em breve, o Marcos ("
-            + ZAP_MARCOS + ") entrar\u00e1 em contato com voc\u00ea atrav\u00e9s do WhatsApp.");
-          return;
-        }
+        if (pago === "SIM") { await falaDaClara(avisoPagamentoRecebido()); return; }
         if (pago === "RECUSADO") {
           await ofereceLinkNovo("Ops! Parece que seu pagamento foi recusado pelo banco.");
           return;
         }
-        await esperar(3000);
+        await esperar(1500);
       }
 
+      // Nao confirmou a tempo: avisa com honestidade em vez de fazer a pessoa esperar.
       await falaDaClara("Muito obrigada! O pagamento est\u00e1 em confirma\u00e7\u00e3o e costuma levar poucos minutos. "
         + "Assim que entrar, o Marcos (" + ZAP_MARCOS + ") te chama no WhatsApp.");
+
+      // FASE 2 - segue conferindo em silencio por mais 2 minutos. Se o dinheiro
+      // cair enquanto a pessoa ainda estiver na tela, ela recebe a boa noticia
+      // na hora em vez de ficar na duvida.
+      var limiteLongo = Date.now() + 120000;
+      while (Date.now() < limiteLongo) {
+        await esperar(5000);
+        var depois = await consultarPagamento();
+        if (depois === "SIM") { await falaDaClara(avisoPagamentoRecebido()); return; }
+        if (depois === "RECUSADO") {
+          await ofereceLinkNovo("Ops! O seu banco acabou recusando o pagamento.");
+          return;
+        }
+      }
     }
 
     (function verificarVoltaDoPagamento() {
