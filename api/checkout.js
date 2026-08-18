@@ -8,7 +8,7 @@
 // esperado quando a pessoa volta depois ou avisa que o link expirou.
 
 const VALOR = 3907;
-const NOME_ITEM = "Planejamento para Neg\u00f3cios";
+const NOME_ITEM = "Plano de IA para Neg\u00f3cios";
 const MAX_PARCELAS = 3;
 const MINUTOS_VALIDADE = 1440; // teto do Asaas
 
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       },
       items: [{
         name: NOME_ITEM,
-        description: "Duas reuni\u00f5es online com o Marcos Betiati e a entrega do plano em at\u00e9 10 dias \u00fateis em uma reuni\u00e3o online.",
+        description: "Duas reuni\u00f5es online prévias com o Marcos Betiati e a entrega do plano em at\u00e9 10 dias \u00fateis em uma terceira reuni\u00e3o online.",
         quantity: 1,
         value: VALOR
       }],
@@ -85,7 +85,13 @@ export default async function handler(req, res) {
 
     // Guarda o id do checkout na planilha. Payload parcial: o Apps Script
     // preserva as colunas que nao vierem preenchidas.
-    registrarNaPlanilha({ id: id, cobranca: String(dados.id || "") });
+    // Este await NAO e opcional. Em funcao serverless, o que nao termina antes
+    // do return e morto junto com a execucao - sem ele, a coluna Cobranca
+    // nunca e gravada, e sem ela o webhook nao acha a linha do pagamento.
+    const gravou = await registrarNaPlanilha({ id: id, cobranca: String(dados.id || "") });
+    if (!gravou) {
+      console.log("CHECKOUT SEM REGISTRO NA PLANILHA id=" + id + " checkout=" + dados.id);
+    }
 
     return res.status(200).json({ ok: true, link: dados.link, checkout: dados.id });
   } catch (err) {
@@ -94,14 +100,20 @@ export default async function handler(req, res) {
   }
 }
 
-// Sem await de proposito: a gravacao na planilha nao pode atrasar a entrega
-// do link para quem esta esperando na conversa.
-function registrarNaPlanilha(linha) {
+// Grava e CONFIRMA. Vale o segundo de espera: sem esta linha na planilha,
+// o pagamento chega depois e nao encontra a conversa a que pertence.
+async function registrarNaPlanilha(linha) {
   const url = process.env.SHEETS_URL;
-  if (!url) return;
-  fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(linha)
-  }).catch(function () {});
+  if (!url) return false;
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(linha)
+    });
+    const d = await r.json();
+    return !!(d && d.ok);
+  } catch (e) {
+    return false;
+  }
 }
