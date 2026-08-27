@@ -9,9 +9,8 @@
     { "source": "/palco", "destination": "/index.html" },
     { "source": "/totem", "destination": "/index.html" },
     { "source": "/display", "destination": "/index.html" },
-    { "source": "/nfc1", "destination": "/index.html" },
-    { "source": "/nfc2", "destination": "/index.html" },
-    { "source": "/caixa2", "destination": "/index.html" },
+    { "source": "/nfc", "destination": "/index.html" },
+    { "source": "/cxh-030926", "destination": "/index.html" },
     { "source": "/site", "destination": "/index.html" },
     { "source": "/privacidade", "destination": "/privacidade.html" }
   ]
