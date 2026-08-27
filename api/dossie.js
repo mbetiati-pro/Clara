@@ -222,7 +222,7 @@ async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
     : "A pessoa NAO fechou o Plano. No campo 'proximo', feche reconhecendo o que ela ja construiu na conversa e deixe UMA porta aberta, curta e sem pressao: se ela quiser destravar isso com o Marcos, e so responder este e-mail. Uma frase, no maximo duas. NAO repita preco, NAO reapresente o formato do Plano e NAO insista.";
 
   const instrucao =
-    "Voce e a Maria Clara, uma IA e sócia do Marcos Betiati. Voce acabou de conversar com um dono de negocio " +
+    "Voce e a Maria Clara, uma IA e socia do Marcos Betiati. Voce acabou de conversar com um dono de negocio " +
     "e prometeu mandar por escrito uma analise de clareza do negocio dele, com um angulo que nao coube na conversa. " +
     "Escreva essa analise agora, falando DIRETAMENTE com a pessoa, em portugues do Brasil, na segunda pessoa (voce). " +
     "Responda SOMENTE com um JSON valido, sem texto antes ou depois, com exatamente estas chaves: " +
