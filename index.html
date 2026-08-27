@@ -173,6 +173,9 @@
     var conversaId = "";
     var briefingEnviado = false;
     var analiseAgendada = false;
+    // Recado da Clara quando a falha e daqui (rede, resposta fora do formato).
+    // O erro tecnico vai para o console; na tela a pessoa so ve a Clara falando.
+    var AVISO_LOCAL = "A conex\u00e3o aqui oscilou por um instante e sua mensagem n\u00e3o chegou at\u00e9 mim. Manda de novo que eu respondo na hora.";
 
     // ---- origem: de onde essa pessoa chegou ----
     // /palco, /totem e /nfc caem no mesmo index.html via rewrite no vercel.json.
@@ -769,12 +772,14 @@
         } else {
           houveFalha = true;
           esconderDigitando(typing);
-          addBubble("[erro] " + (data.error || "sem resposta"), "clara");
+          console.log("CLARA falha: " + ((data && data.error) || "sem resposta"));
+          addBubble(AVISO_LOCAL, "clara");
         }
       } catch (err) {
         houveFalha = true;
         esconderDigitando(typing);
-        addBubble("[erro de conexao] " + err, "clara");
+        console.log("CLARA falha de rede: " + err);
+        addBubble(AVISO_LOCAL, "clara");
       }
       respondendo = false;
       send.disabled = false;
