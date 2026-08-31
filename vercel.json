@@ -11,8 +11,8 @@
     { "source": "/display", "destination": "/index.html" },
     { "source": "/nfc", "destination": "/index.html" },
     { "source": "/cxh-030926", "destination": "/index.html" },
-     { "source": "/cxh-030926-nfc", "destination": "/index.html" },
-     { "source": "/cxh-030926-palco", "destination": "/index.html" },
+    { "source": "/cxh-030926-nfc", "destination": "/index.html" },
+    { "source": "/cxh-030926-palco", "destination": "/index.html" },
     { "source": "/site", "destination": "/index.html" },
     { "source": "/privacidade", "destination": "/privacidade.html" }
   ]
