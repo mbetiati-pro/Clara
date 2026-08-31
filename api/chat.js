@@ -210,7 +210,7 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
 `;
 
   try {
-    const { messages, id, origem } = req.body || {};
+    const { messages, id, origem, retomada, pendente } = req.body || {};
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: "Formato invalido: falta 'messages'." });
     }
@@ -219,11 +219,38 @@ A jornada é Clareza (você, gratuita), depois Planejamento (o Plano de IA, com 
       return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] };
     });
 
+    // Retomada: a pessoa voltou clicando no botao da analise enviada por e-mail.
+    // O turno sintetico nao entra em messages, entao nao aparece na tela nem no dossie.
+    const ehRetomada = retomada === true && contents.length > 0;
+    if (ehRetomada) {
+      contents.push({ role: "user", parts: [{ text: "[a pessoa voltou para a conversa pelo botao da analise que voce enviou por e-mail]" }] });
+    }
+
+    // Texto exato do fecho que foi prometido no e-mail, quando o frontend conseguiu guardar.
+    const textoPendente = ehRetomada ? String(pendente || "").trim().slice(0, 600) : "";
+
+    // A instrucao extra vai no FIM do prompt, nunca no comeco: prefixo alterado invalida o cache.
+    const instrucaoFinal = ehRetomada
+      ? instrucaoMestra + `
+
+RETOMADA VINDA DO E-MAIL (vale SO para esta resposta)
+A pessoa clicou no botao da analise que voce mandou por e-mail e voltou para esta conversa. Ela ainda nao escreveu nada: quem fala primeiro e voce.
+` + (textoPendente
+        ? `ESTE e o fecho exato que voce escreveu no e-mail dela, e e o assunto que ela veio buscar:
+"""
+` + textoPendente + `
+"""
+Abra retomando EXATAMENTE esse ponto, nao outro. Uma frase curta reconhecendo que ela voltou, e a pergunta que ficou pendente ali. E PROIBIDO trocar de assunto ou puxar um tema novo nesta primeira mensagem: ela clicou por causa disso, e comecar por outra coisa quebra a promessa.`
+        : `Releia a conversa acima, encontre o assunto que ficou pela metade - a pergunta que voce nao chegou a fazer ou a resposta que ficou rasa - e abra retomando exatamente esse ponto. Uma frase curta reconhecendo que ela voltou, e a pergunta pendente.`)
+      + `
+NAO se reapresente, NAO recomece a descoberta, NAO repita o que ja foi dito, NAO resuma a analise inteira e NAO mencione o e-mail mais de uma vez. Se a conversa ja tinha coberto tudo, abra pelo proximo passo natural do arco, nunca por uma pergunta que ela ja respondeu.`
+      : instrucaoMestra;
+
     const model = "gemini-3.6-flash";
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
 
     const corpo = JSON.stringify({
-      systemInstruction: { parts: [{ text: instrucaoMestra }] },
+      systemInstruction: { parts: [{ text: instrucaoFinal }] },
       contents: contents
     });
 
