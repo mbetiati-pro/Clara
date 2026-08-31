@@ -269,7 +269,11 @@ function calcularAgendamento(origem) {
   const EVENTO = { palco: 1, totem: 1, nfc: 1 };
   const agora = Date.now();
 
-  if (!EVENTO[origem]) {
+  // Qualquer origem de caixa (box, box-nfc, box-palco, e as de eventos futuros)
+  // conta como evento sem precisar editar esta lista a cada evento.
+  const ehEvento = EVENTO[origem] === 1 || origem === "box" || origem.indexOf("box-") === 0;
+
+  if (!ehEvento) {
     return new Date(agora + 3600000).toISOString();
   }
 
