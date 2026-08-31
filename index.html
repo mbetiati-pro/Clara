@@ -178,11 +178,19 @@
     var AVISO_LOCAL = "A conex\u00e3o aqui oscilou por um instante e sua mensagem n\u00e3o chegou at\u00e9 mim. Manda de novo que eu respondo na hora.";
 
     // ---- origem: de onde essa pessoa chegou ----
-    // /palco, /totem e /nfc caem no mesmo index.html via rewrite no vercel.json.
+    // Todos os caminhos abaixo caem no mesmo index.html via rewrite no vercel.json.
     // A URL nao muda, entao o caminho identifica a porta de entrada.
     // Vale o primeiro toque: quem entrou pelo totem continua totem se voltar depois.
+    // Eventos usam prefixo "box-" no rotulo; o dossie trata qualquer "box" como evento.
     var CHAVE_ORIGEM = "clara_origem";
-    var PORTAS = { "/palco": "palco", "/totem": "totem", "/nfc": "nfc" };
+    var PORTAS = {
+      "/palco": "palco",
+      "/totem": "totem",
+      "/nfc": "nfc",
+      "/cxh-030926": "box",
+      "/cxh-030926-nfc": "box-nfc",
+      "/cxh-030926-palco": "box-palco"
+    };
 
     function detectarOrigem() {
       var caminho = location.pathname.replace(/\/+$/, "").toLowerCase();
