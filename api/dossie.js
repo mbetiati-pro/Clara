@@ -177,6 +177,7 @@ export default async function handler(req, res) {
     // longa ou venda fechada), so uma vez, e so com e-mail valido.
     // -----------------------------------------------------------------------
     let analiseAgendadaAgora = false;
+    let pendenteDoEmail = "";
     const emailPessoa = limparEmail(campo(dossie.email));
     const podeAgendar = (encerrando || fechou)
       && !analiseJaAgendada
@@ -192,6 +193,10 @@ export default async function handler(req, res) {
           const enviado = await agendarAnalise(analise, emailPessoa, quando, id);
           if (enviado) {
             analiseAgendadaAgora = true;
+            // O fecho prometido no e-mail volta pro frontend, que guarda no
+            // aparelho. Quando a pessoa clicar no botao, a Clara retoma
+            // exatamente este ponto em vez de deduzir outro.
+            pendenteDoEmail = String(analise.proximo || "").slice(0, 600);
             console.log("ANALISE AGENDADA id=" + id + " origem=" + origem + " para=" + quando);
 
             // Segunda gravacao, so pra registrar o horario na coluna Analise.
@@ -222,7 +227,8 @@ export default async function handler(req, res) {
       ok: true,
       fechou: fechou,
       briefingEnviado: briefingEnviado,
-      analiseAgendada: analiseAgendadaAgora
+      analiseAgendada: analiseAgendadaAgora,
+      pendente: pendenteDoEmail
     });
   } catch (err) {
     return res.status(500).json({ error: "Falha: " + String(err) });
@@ -237,7 +243,12 @@ export default async function handler(req, res) {
 async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
   const fecho = fechou
     ? "A pessoa JA FECHOU o Plano com o Marcos. No campo 'proximo', de as boas-vindas com sobriedade e diga que o Marcos entra em contato pelo WhatsApp para agendar as duas reunioes. NAO venda nada de novo e NAO repita preco."
-    : "A pessoa NAO fechou o Plano. No campo 'proximo', feche reconhecendo o que ela ja construiu na conversa e deixe UMA porta aberta, curta e sem pressao: se ela quiser destravar isso com o Marcos, e so responder este e-mail. Uma frase, no maximo duas. NAO repita preco, NAO reapresente o formato do Plano e NAO insista.";
+    : "A pessoa NAO fechou o Plano. No campo 'proximo', faca DUAS coisas, em duas ou tres frases no total: " +
+      "(1) nomeie UM assunto especifico que ficou pela metade na conversa - uma pergunta que voce nao chegou a fazer, " +
+      "um numero que faltou, um angulo que vale abrir - e diga em uma frase por que ele importa pra ela; " +
+      "(2) convide ela a voltar a conversar com voce sobre esse assunto. " +
+      "NAO escreva link, URL nem 'clique aqui': o botao de voltar entra automaticamente logo abaixo do seu texto. " +
+      "NAO peca para responder o e-mail, NAO repita preco, NAO reapresente o formato do Plano e NAO insista.";
 
   const instrucao =
     "Voce e a Maria Clara, uma IA e socia do Marcos Betiati. Voce acabou de conversar com um dono de negocio " +
@@ -278,6 +289,7 @@ async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
   const a = extrairJson(r.data);
   if (!a || !a.insight || !a.retrato) return null;
   if (!a.nome) a.nome = "";
+  a.fechou = fechou === true;
   return a;
 }
 
@@ -354,20 +366,32 @@ function montarEmailAnalise(a) {
     ? "Ol\u00e1, " + esc(primeiro) + "!<br>Tudo bom?"
     : "Ol\u00e1!<br>Tudo bom?";
 
+  const FONTE = "font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#222222";
+  const AZUL = "#0070C0";
+
   return "" +
-  '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;color:#111b21;line-height:1.6;max-width:600px;margin:0 auto;padding:8px">' +
+  '<div style="' + FONTE + ';max-width:640px">' +
   '<p style="margin:0 0 16px 0">' + abertura + "</p>" +
   paragrafos(a.retrato) +
-  '<div style="border-left:3px solid #00674f;padding-left:16px;margin:0 0 16px 0">' +
+  '<div style="border-left:3px solid ' + AZUL + ';padding-left:16px;margin:0 0 16px 0">' +
   paragrafos(a.insight) +
   "</div>" +
   paragrafos(a.proximo) +
-  '<p style="margin:0 0 16px 0">Muito obrigada!</p>' +
-  '<p style="margin:0 0 16px 0">Abra\u00e7os,<br>Maria Clara<br>' +
-  '<a href="https://mariaclara.ai" style="color:#00674f">mariaclara.ai</a></p>' +
-  '<p style="margin:24px 0 0 0;color:#667781;font-size:13px;line-height:1.5;border-top:1px solid #e2dcd3;padding-top:14px">' +
-  "Maria Clara, sou uma IA e s\u00f3cia do Marcos Betiati.<br>" +
-  "Escrevi esta an\u00e1lise a partir da conversa que tivemos em mariaclara.ai.</p>" +
+  (a.fechou ? "" :
+    '<p style="margin:0 0 20px 0">' +
+    '<a href="https://mariaclara.ai/?volta=email&amp;utm_source=email" ' +
+    'style="display:inline-block;background:' + AZUL + ';color:#ffffff;text-decoration:none;' +
+    'padding:12px 22px;border-radius:6px;font-weight:bold;' + FONTE + '">' +
+    "Voltar a falar com a Maria Clara</a></p>") +
+  '<p style="margin:0 0 16px 0">Muito obrigada! \uD83D\uDE0A</p>' +
+  '<p style="margin:0 0 16px 0">Abra\u00e7os,<br><b>Maria Clara</b><br>' +
+  '<a href="https://mariaclara.ai" style="color:' + AZUL + '">mariaclara.ai</a></p>' +
+  '<p style="margin:0 0 8px 0">---------</p>' +
+  '<p style="margin:0">' +
+  "\uD83D\uDC69 Maria Clara, s\u00f3cia de IA do Marcos Betiati na " +
+  '<a href="https://mbetiati.pro" style="color:' + AZUL + '">mbetiati.pro</a>.<br>' +
+  "\uD83E\uDDE0 Escrevi esta an\u00e1lise a partir da conversa que tivemos em " +
+  '<a href="https://mariaclara.ai" style="color:' + AZUL + '">mariaclara.ai</a>.</p>' +
   "</div>";
 }
 
