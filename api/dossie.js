@@ -48,8 +48,8 @@ export default async function handler(req, res) {
       "negocio (o que o negocio faz, em uma frase), " +
       "objetivo (a empreitada especifica que a pessoa esta perseguindo), " +
       "dor (a dor principal, de preferencia com as PALAVRAS da propria pessoa entre aspas), " +
-      "sucesso (o que a pessoa definiu como SUCESSO nessa empreitada, com as palavras dela), " +
-      "pronto (o sinal concreto de que esta PRONTO/resolvido, com as palavras dela), " +
+      "sucesso (o que significa DAR CERTO nessa empreitada para ela), " +
+      "pronto (o sinal concreto de que esta PRONTO/resolvido), " +
       "temQue (o que TEM QUE ACONTECER para esse pronto valer), " +
       "naoPode (o que NAO PODE ACONTECER de jeito nenhum), " +
       "fracasso (o que seria FRACASSO, e PARA QUEM), " +
@@ -61,9 +61,27 @@ export default async function handler(req, res) {
       "1 = nao decide, sem dor definida, ou porte incompativel. Seja severo: 5 e raro e a maioria fica em 2 ou 3), " +
       "leitura (a leitura estrategica: por onde o Marcos deve puxar, o gancho mais forte), " +
       "lacunas (liste o que ficou faltando ou raso e o Marcos precisa investigar na primeira reuniao). " +
-      "IMPORTANTE: nos campos sucesso, pronto, temQue, naoPode e fracasso, registre APENAS o que a PROPRIA PESSOA " +
-      "respondeu. Se quem trouxe aquilo foi a Maria Clara e a pessoa nao confirmou, escreva 'nao respondido pela pessoa'. " +
-      "Se algum campo ainda nao tiver informacao, escreva 'nao informado'.";
+      "COMO PREENCHER OS CINCO CAMPOS (sucesso, pronto, temQue, naoPode, fracasso) - regra central deste dossie: " +
+      "o Marcos precisa da leitura pronta, nao da transcricao picada. Ninguem responde 'meu sucesso e reduzir a " +
+      "inadimplencia para 4%'; as pessoas respondem cena. Seu trabalho e transformar o que ela disse em um cenario " +
+      "escrito, e sempre deixar claro de onde aquilo veio. Use exatamente um destes tres formatos: " +
+      "(a) Se a PROPRIA PESSOA respondeu: escreva o cenario em uma frase sua e coloque a fala dela entre aspas no fim. " +
+      "Ex: sucesso = 'Os honorarios entrando todo dia 10 para ela parar de cobrir a folha da equipe do proprio bolso " +
+      "(\"estar em dia as cobrancas e despesas\").' " +
+      "(b) Se ela NAO respondeu diretamente, mas a conversa inteira permite deduzir com seguranca: escreva o cenario " +
+      "e comece o campo com o marcador [INFERIDO]. A deducao tem que se apoiar em coisas que ela disse, nunca em " +
+      "suposicao sobre o ramo. Ex: temQue = '[INFERIDO] Uma regra de cobranca que a equipe execute sozinha, " +
+      "sem ela precisar intervir a cada atraso.' " +
+      "(c) Se ela nao respondeu e NAO da para deduzir do que ela disse: escreva exatamente 'nao informado'. " +
+      "E PROIBIDO registrar como resposta dela algo que quem trouxe foi a Maria Clara e ela nao confirmou - isso " +
+      "vira [INFERIDO], nunca fala da pessoa. Nunca use aspas em volta de frase que a pessoa nao escreveu. " +
+      "NAO invente para preencher: 'nao informado' honesto vale mais que um cenario errado, porque o Marcos entra " +
+      "na reuniao acreditando no que estiver escrito aqui. " +
+      "Use um unico marcador de vazio em todo o dossie: 'nao informado'. Nao escreva 'nao respondido pela pessoa', " +
+      "'nao se aplica' nem variacoes. " +
+      "NO CAMPO LACUNAS, comece nomeando quais dos cinco ficaram como 'nao informado' ou como [INFERIDO] " +
+      "e precisam ser confirmados na primeira reuniao, e so depois liste o resto (numeros, porte, estrutura). " +
+      "Se os cinco estiverem resolvidos com fala da propria pessoa, diga isso na primeira frase.";
 
     const model = "gemini-3.6-flash";
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
