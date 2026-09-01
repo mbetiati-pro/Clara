@@ -246,7 +246,8 @@ async function gerarAnalise(transcricao, fechou, url, apiKey, qtdMensagens) {
     : "A pessoa NAO fechou o Plano. No campo 'proximo', faca DUAS coisas, em duas ou tres frases no total: " +
       "(1) nomeie UM assunto especifico que ficou pela metade na conversa - uma pergunta que voce nao chegou a fazer, " +
       "um numero que faltou, um angulo que vale abrir - e diga em uma frase por que ele importa pra ela; " +
-      "(2) convide ela a voltar a conversar com voce sobre esse assunto. " +
+      "(2) convide ela a voltar a conversar com voce sobre esse assunto, e TERMINE o texto com reticencias (...) " +
+      "para sinalizar que ainda ha coisa a dizer. " +
       "NAO escreva link, URL nem 'clique aqui': o botao de voltar entra automaticamente logo abaixo do seu texto. " +
       "NAO peca para responder o e-mail, NAO repita preco, NAO reapresente o formato do Plano e NAO insista.";
 
@@ -380,15 +381,15 @@ function montarEmailAnalise(a) {
   (a.fechou ? "" :
     '<p style="margin:0 0 20px 0">' +
     '<a href="https://mariaclara.ai/?volta=email&amp;utm_source=email" ' +
-    'style="display:inline-block;background:' + AZUL + ';color:#ffffff;text-decoration:none;' +
-    'padding:12px 22px;border-radius:6px;font-weight:bold;' + FONTE + '">' +
+    'style="' + FONTE + ';display:inline-block;background:' + AZUL + ';text-decoration:none;' +
+    'padding:12px 22px;border-radius:6px;font-weight:bold;color:#ffffff">' +
     "Voltar a falar com a Maria Clara</a></p>") +
   '<p style="margin:0 0 16px 0">Muito obrigada! \uD83D\uDE0A</p>' +
   '<p style="margin:0 0 16px 0">Abra\u00e7os,<br><b>Maria Clara</b><br>' +
   '<a href="https://mariaclara.ai" style="color:' + AZUL + '">mariaclara.ai</a></p>' +
-  '<p style="margin:0 0 8px 0">---------</p>' +
+  '<p style="margin:0 0 8px 0;font-weight:normal;color:#888888">---------</p>' +
   '<p style="margin:0">' +
-  "\uD83D\uDC69 Maria Clara, s\u00f3cia de IA do Marcos Betiati na " +
+  "\uD83D\uDC69 Maria Clara, sou uma IA e s\u00f3cia do Marcos Betiati no " +
   '<a href="https://mbetiati.pro" style="color:' + AZUL + '">mbetiati.pro</a>.<br>' +
   "\uD83E\uDDE0 Escrevi esta an\u00e1lise a partir da conversa que tivemos em " +
   '<a href="https://mariaclara.ai" style="color:' + AZUL + '">mariaclara.ai</a>.</p>' +
