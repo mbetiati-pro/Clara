@@ -192,6 +192,15 @@
       "/cxh-030926-palco": "box-palco"
     };
 
+    function limparParametroVolta() {
+      // Tira o volta=email da barra: assim um refresh nao parece um clique novo.
+      try {
+        var u = new URL(location.href);
+        u.searchParams.delete("volta");
+        history.replaceState(null, "", u.pathname + (u.search || "") + u.hash);
+      } catch (e) {}
+    }
+
     function voltouDoEmail() {
       try {
         return (new URLSearchParams(location.search).get("volta") || "") === "email";
@@ -222,7 +231,7 @@
       catch (e) { return "c" + Date.now() + Math.random().toString(16).slice(2); }
     }
     function salvarLocal() {
-      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages, briefingEnviado: briefingEnviado, analiseAgendada: analiseAgendada, pendenteDoEmail: pendenteDoEmail })); } catch (e) {}
+      try { localStorage.setItem(CHAVE, JSON.stringify({ id: conversaId, messages: messages, briefingEnviado: briefingEnviado, analiseAgendada: analiseAgendada, pendenteDoEmail: pendenteDoEmail, retomadaFeita: retomadaFeita })); } catch (e) {}
     }
     function carregarLocal() {
       try { return JSON.parse(localStorage.getItem(CHAVE)); } catch (e) { return null; }
@@ -462,6 +471,9 @@
     // Texto do fecho prometido no e-mail de analise. Guardado no aparelho para
     // que a retomada pelo botao pegue exatamente o ponto prometido, e nao outro.
     var pendenteDoEmail = "";
+    // Trava para a retomada disparar UMA vez por promessa. Sem isso, cada clique
+    // no botao do e-mail (ou cada refresh) gera uma saudacao nova empilhada.
+    var retomadaFeita = false;
     var dossieUltimoTamanho = 0;
 
     function agendarDossie() {
@@ -538,7 +550,10 @@
         if (data && (data.briefingEnviado || data.analiseAgendada)) {
           if (data.briefingEnviado) briefingEnviado = true;
           if (data.analiseAgendada) analiseAgendada = true;
-          if (data.pendente) pendenteDoEmail = String(data.pendente);
+          if (data.pendente && String(data.pendente) !== pendenteDoEmail) {
+            pendenteDoEmail = String(data.pendente);
+            retomadaFeita = false;
+          }
           salvarLocal();
         }
         status.textContent = (data && data.ok) ? "salvo" : "erro ao salvar";
@@ -584,7 +599,10 @@
             if (data && (data.briefingEnviado || data.analiseAgendada)) {
               if (data.briefingEnviado) briefingEnviado = true;
               if (data.analiseAgendada) analiseAgendada = true;
-              if (data.pendente) pendenteDoEmail = String(data.pendente);
+              if (data.pendente && String(data.pendente) !== pendenteDoEmail) {
+                pendenteDoEmail = String(data.pendente);
+                retomadaFeita = false;
+              }
               salvarLocal();
             }
           })
@@ -1016,6 +1034,7 @@
       briefingEnviado = salvo.briefingEnviado === true;
       analiseAgendada = salvo.analiseAgendada === true;
       pendenteDoEmail = typeof salvo.pendenteDoEmail === "string" ? salvo.pendenteDoEmail : "";
+      retomadaFeita = salvo.retomadaFeita === true;
       dossieUltimoTamanho = messages.length;
       for (var j = 0; j < messages.length; j++) {
         addBubble(messages[j].content, messages[j].role === "assistant" ? "clara" : "user", messages[j].t);
@@ -1025,7 +1044,12 @@
       // Voltou clicando no botao da analise enviada por e-mail: quem fala primeiro e a Clara.
       // So dispara se existir conversa salva; sem historico nao ha o que retomar.
       if (voltouDoEmail()) {
-        setTimeout(function () { if (!respondendo) responder(true); }, 700);
+        limparParametroVolta();
+        if (!retomadaFeita) {
+          retomadaFeita = true;
+          salvarLocal();
+          setTimeout(function () { if (!respondendo) responder(true); }, 700);
+        }
       }
     } else {
       conversaId = novoId();
